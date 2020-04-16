@@ -3,33 +3,36 @@
 
 # 利用パッケージ
 library(tidyverse)
-library(MCMCpack) # rdirichlet()のため
+library(gganimate)
 
 
 # パラメータの設定 ----------------------------------------------------------------
 
 # 観測データ数を指定
-N <- 1000
+N <- 100
 
 # 真のパラメータを指定
 lambda_true <- c(5, 25)
-K <- length(lambda_true)
 
 # 観測データXを生成
 x_n <- rpois(n = N, lambda = lambda_true)
 
+# 観測データを確認
 tibble(
-  x = rpois(n = N, lambda = lambda_true)
+  x = x_n
 ) %>% 
   ggplot(aes(x = x)) + 
     geom_bar()
 
 # 試行回数を指定
-Iter <- 100
+Iter <- 50
+
+# クラスタ数
+K <- length(lambda_true)
 
 # ハイパーパラメータa,bを指定
 a <- 2
-b <- 0.5
+b <- 2
 
 # パラメータlambdaを生成
 lambda_k <- rgamma(n = K, shape = a, rate = b)
@@ -44,20 +47,25 @@ pi_k <- MCMCpack::rdirichlet(n = 1, alpha = alpha_k) %>%
 # 潜在変数Sの初期値
 s_nk <- matrix(0, nrow = N, ncol = K)
 
-# 受け皿
+
+# ギブスサンプリング ---------------------------------------------------------------
+
+# 受け皿を用意
 eta_nk <- matrix(0, nrow = N, ncol = K)
 a_hat_k <- rep(0, K)
 b_hat_k <- rep(0, K)
 
-# ギブスサンプリング ---------------------------------------------------------------
-
 # 推移の確認用データフレームを作成
-trace_df <- data.frame(
-  alpha = alpha_k, 
-  a = rep(a, K), 
-  b = rep(b, K), 
-  pi = pi_k, 
+parameter_df <- tibble(
+  a_hat = rep(a, K), 
+  b_hat = rep(b, K), 
+  alpha_hat = alpha_k, 
   k = as.factor(1:K), 
+  Iter = 0
+)
+posterior_df <- tibble(
+  x = rep(seq(0, max(x_n), by = 0.01), each = K), 
+  value = dgamma(x, shape = rep(a, K), rate = rep(b, K)), 
   Iter = 0
 )
 
@@ -67,7 +75,7 @@ for(i in 1:Iter) {
     
     # ハイパーパラメータを更新
     tmp_eta_k <- exp(x_n[n] * log(lambda_k) - lambda_k + log(pi_k))
-    eta_nk[n, ] <- tmp_eta_k <- sum(tmp_eta_k)
+    eta_nk[n, ] <- tmp_eta_k / sum(tmp_eta_k)
     
     # 潜在変数sをサンプリング:式(4.37)
     s_nk[n, ] <- rmultinom(n =  1, size = 1, prob = eta_nk[n, ]) %>% 
@@ -92,37 +100,65 @@ for(i in 1:Iter) {
     as.vector()
   
   # 推移の確認用データフレームを作成
-  tmp_trace_df <- data.frame(
-    alpha = alpha_hat_k, 
-    a = a_hat_k, 
-    b = b_hat_k, 
-    pi = pi_k, 
+  tmp_parameter_df <- data.frame(
+    a_hat = a_hat_k, 
+    b_hat = b_hat_k, 
+    alpha_hat = alpha_hat_k, 
     k = as.factor(1:K), 
     Iter = i
   )
+  tmp_posterior_df <- tibble(
+    x = rep(seq(0, max(x_n), by = 0.01), each = K), 
+    value = dgamma(x, shape = a_hat_k, rate = b_hat_k), 
+    Iter = i
+  )
   # 結合
-  trace_df <- rbind(trace_df, tmp_trace_df)
+  parameter_df <- rbind(parameter_df, tmp_parameter_df)
+  posterior_df <- rbind(posterior_df, tmp_posterior_df)
 }
 
 
 # 結果の確認 -------------------------------------------------------------------
 
-lambda_df <- tibble()
+posterior_df <- tibble()
 for(k in 1:K) {
   tmp_df <- tibble(
-    x = seq(0, 50, by = 0.1), 
+    x = seq(0, max(x_n), by = 0.1), 
     value = dgamma(x, shape = a_hat_k[k], rate = b_hat_k[k]), 
     k = as.factor(k)
   )
-  lambda_df <- rbind(lambda_df, tmp_df)
+  posterior_df <- rbind(posterior_df, tmp_df)
 }
 
 # 作図
-ggplot(lambda_df, aes(x = x, y = value, color = k)) + 
+ggplot(posterior_df, aes(x = x, y = value, color = k)) + 
   geom_line() + 
-  geom_vline(xintercept = lambda_true) + 
+  geom_vline(xintercept = lambda_true, color = "orange", linetype = "dashed") + 
   labs(title = "Poisson mixture model:Gibbs sampling", 
        subtitle = expression(lambda))
 
 # 推移の確認 -------------------------------------------------------------------
 
+# 作図
+posterior_graph <- ggplot(posterior_df, aes(x, value)) + 
+  geom_line(color = "#00A968") + 
+  geom_vline(xintercept = lambda_true, 
+             color = "orange", linetype = "dashed") + 
+  transition_manual(Iter) + 
+  labs(title = "Poisson mixture model:Gibbs sampling", 
+       subtitle = "i={current_frame}")
+
+# 描画
+animate(posterior_graph, nframes = Iter + 1, fps = 5)
+
+col_name
+parameter_df %>% 
+  select(-alpha_hat) %>% 
+  pivot_longer(
+    cols = -c(k, Iter), 
+    names_to = "parameter", 
+    names_ptypes = list(parameter = factor()), 
+    values_to = "value"
+  ) %>% 
+  ggplot(aes(parameter, value, color = k)) + 
+    geom_line()
