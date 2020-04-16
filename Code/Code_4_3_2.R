@@ -9,17 +9,23 @@ library(MCMCpack) # rdirichlet()のため
 # パラメータの設定 ----------------------------------------------------------------
 
 # 観測データ数を指定
-N <- 20
+N <- 1000
 
 # 真のパラメータを指定
-lambda_true <- c(1, 2, 3, 3.5)
+lambda_true <- c(5, 25)
 K <- length(lambda_true)
 
 # 観測データXを生成
 x_n <- rpois(n = N, lambda = lambda_true)
 
+tibble(
+  x = rpois(n = N, lambda = lambda_true)
+) %>% 
+  ggplot(aes(x = x)) + 
+    geom_bar()
+
 # 試行回数を指定
-Iter <- 10
+Iter <- 100
 
 # ハイパーパラメータa,bを指定
 a <- 2
@@ -40,7 +46,8 @@ s_nk <- matrix(0, nrow = N, ncol = K)
 
 # 受け皿
 eta_nk <- matrix(0, nrow = N, ncol = K)
-
+a_hat_k <- rep(0, K)
+b_hat_k <- rep(0, K)
 
 # ギブスサンプリング ---------------------------------------------------------------
 
@@ -70,8 +77,8 @@ for(i in 1:Iter) {
   for(k in 1:K) {
     
     # ハイパーパラメータを更新
-    a_hat_k <- sum(s_nk[, k] * x_n) + a
-    b_hat_k <- sum(s_nk[, k]) + b
+    a_hat_k[k] <- sum(s_nk[, k] * x_n) + a
+    b_hat_k[k] <- sum(s_nk[, k]) + b
     
     # パラメータlambdaをサンプリング:式(4.41)
     lambda_k <- rgamma(n = K, shape = a_hat_k, rate = b_hat_k)
@@ -99,3 +106,23 @@ for(i in 1:Iter) {
 
 
 # 結果の確認 -------------------------------------------------------------------
+
+lambda_df <- tibble()
+for(k in 1:K) {
+  tmp_df <- tibble(
+    x = seq(0, 50, by = 0.1), 
+    value = dgamma(x, shape = a_hat_k[k], rate = b_hat_k[k]), 
+    k = as.factor(k)
+  )
+  lambda_df <- rbind(lambda_df, tmp_df)
+}
+
+# 作図
+ggplot(lambda_df, aes(x = x, y = value, color = k)) + 
+  geom_line() + 
+  geom_vline(xintercept = lambda_true) + 
+  labs(title = "Poisson mixture model:Gibbs sampling", 
+       subtitle = expression(lambda))
+
+# 推移の確認 -------------------------------------------------------------------
+
