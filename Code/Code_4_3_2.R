@@ -8,11 +8,11 @@ library(gganimate)
 
 # パラメータの設定 ----------------------------------------------------------------
 
-# 観測データ数を指定
-N <- 100
-
 # 真のパラメータを指定
 lambda_true <- c(5, 25)
+
+# 観測データ数を指定
+N <- 100
 
 # 観測データXを生成
 x_n <- rpois(n = N, lambda = lambda_true)
@@ -22,7 +22,7 @@ tibble(
   x = x_n
 ) %>% 
   ggplot(aes(x = x)) + 
-    geom_bar()
+    geom_bar(fill = "#56256E")
 
 # 試行回数を指定
 Iter <- 50
@@ -56,43 +56,37 @@ a_hat_k <- rep(0, K)
 b_hat_k <- rep(0, K)
 
 # 推移の確認用データフレームを作成
-parameter_df <- tibble(
+trace_parameter_df <- tibble(
   a_hat = rep(a, K), 
   b_hat = rep(b, K), 
-  alpha_hat = alpha_k, 
-  k = as.factor(1:K), 
-  Iter = 0
-)
-posterior_df <- tibble(
-  x = rep(seq(0, max(x_n), by = 0.01), each = K), 
-  value = dgamma(x, shape = rep(a, K), rate = rep(b, K)), 
-  Iter = 0
+  cluster = as.factor(1:K), 
+  Iteration = 0 # 初期値
 )
 
 for(i in 1:Iter) {
   
   for(n in 1:N) {
     
-    # ハイパーパラメータを更新
+    # ハイパーパラメータeta_nを計算:式(4.38)
     tmp_eta_k <- exp(x_n[n] * log(lambda_k) - lambda_k + log(pi_k))
-    eta_nk[n, ] <- tmp_eta_k / sum(tmp_eta_k)
+    eta_nk[n, ] <- tmp_eta_k / sum(tmp_eta_k) # 正規化
     
-    # 潜在変数sをサンプリング:式(4.37)
+    # 潜在変数s_nをサンプリング:式(4.37)
     s_nk[n, ] <- rmultinom(n =  1, size = 1, prob = eta_nk[n, ]) %>% 
       as.vector()
   }
   
   for(k in 1:K) {
     
-    # ハイパーパラメータを更新
+    # ハイパーパラメータhat{a}_k,hat{b}_kを計算:式(4.42)
     a_hat_k[k] <- sum(s_nk[, k] * x_n) + a
     b_hat_k[k] <- sum(s_nk[, k]) + b
     
-    # パラメータlambdaをサンプリング:式(4.41)
+    # パラメータlambda_kをサンプリング:式(4.41)
     lambda_k <- rgamma(n = K, shape = a_hat_k, rate = b_hat_k)
   }
   
-  # ハイパーパラメータをalpha更新:式(4.45)
+  # ハイパーパラメータをhat{alpha}を計算:式(4.45)
   alpha_hat_k <- apply(s_nk, 2, sum) + alpha_k
   
   # パラメータpiをサンプリング:式(4.44)
@@ -103,18 +97,11 @@ for(i in 1:Iter) {
   tmp_parameter_df <- data.frame(
     a_hat = a_hat_k, 
     b_hat = b_hat_k, 
-    alpha_hat = alpha_hat_k, 
-    k = as.factor(1:K), 
-    Iter = i
-  )
-  tmp_posterior_df <- tibble(
-    x = rep(seq(0, max(x_n), by = 0.01), each = K), 
-    value = dgamma(x, shape = a_hat_k, rate = b_hat_k), 
-    Iter = i
+    cluster = as.factor(1:K), 
+    Iteration = i # 試行回数
   )
   # 結合
-  parameter_df <- rbind(parameter_df, tmp_parameter_df)
-  posterior_df <- rbind(posterior_df, tmp_posterior_df)
+  trace_parameter_df <- rbind(trace_parameter_df, tmp_parameter_df)
 }
 
 
@@ -123,42 +110,71 @@ for(i in 1:Iter) {
 posterior_df <- tibble()
 for(k in 1:K) {
   tmp_df <- tibble(
-    x = seq(0, max(x_n), by = 0.1), 
-    value = dgamma(x, shape = a_hat_k[k], rate = b_hat_k[k]), 
-    k = as.factor(k)
+    x = seq(0, max(x_n), by = 0.01), 
+    density = dgamma(x, shape = a_hat_k[k], rate = b_hat_k[k]), 
+    cluster = as.factor(k)
   )
   posterior_df <- rbind(posterior_df, tmp_df)
 }
 
 # 作図
-ggplot(posterior_df, aes(x = x, y = value, color = k)) + 
-  geom_line() + 
-  geom_vline(xintercept = lambda_true, color = "orange", linetype = "dashed") + 
+ggplot(posterior_df, aes(x, density, color = cluster)) + 
+  geom_line() + # 折れ線グラフ
+  scale_color_manual(values = c("#00A968", "orange")) + # グラフの色(不必要)
+  geom_vline(xintercept = lambda_true, color = "pink", linetype = "dashed") + # 垂直線
   labs(title = "Poisson mixture model:Gibbs sampling", 
-       subtitle = expression(lambda))
+       subtitle = paste0("a_hat=(", paste0(a_hat_k, collapse = ", "), 
+                         "), b_hat=(", paste0(b_hat_k, collapse = ", "), ")")) # ラベル
+
 
 # 推移の確認 -------------------------------------------------------------------
 
+## 事後分布の推移
+# 作図用のデータフレームを作成
+trace_posterior_df <- tibble()
+for(i in 1:(Iter + 1)) {
+  for(k in 1:K) {
+    tmp_parameter <- trace_parameter_df %>% 
+      filter(Iteration == i - 1, cluster == k)
+    tmp_posterior <- tibble(
+      x = seq(0, max(x_n), by = 0.01), 
+      density = dgamma(x, shape = tmp_parameter[["a_hat"]], rate = tmp_parameter[["b_hat"]]), 
+      cluster = tmp_parameter[["cluster"]], 
+      Iteration = tmp_parameter[["Iteration"]]
+    )
+    trace_posterior_df <- rbind(trace_posterior_df, tmp_posterior)
+  }
+}
+
 # 作図
-posterior_graph <- ggplot(posterior_df, aes(x, value)) + 
-  geom_line(color = "#00A968") + 
+posterior_graph <- ggplot(trace_posterior_df, aes(x, density, color = cluster)) + 
+  geom_line() + # 折れ線グラフ
+  scale_color_manual(values = c("#00A968", "orange")) + # グラフの色(不必要)
   geom_vline(xintercept = lambda_true, 
-             color = "orange", linetype = "dashed") + 
-  transition_manual(Iter) + 
+             color = "pink", linetype = "dashed") + # 垂直線
+  transition_manual(Iteration) + # フレーム
   labs(title = "Poisson mixture model:Gibbs sampling", 
-       subtitle = "i={current_frame}")
+       subtitle = "i={current_frame}") # ラベル
 
 # 描画
-animate(posterior_graph, nframes = Iter + 1, fps = 5)
+animate(posterior_graph, nframes = Iter + 1, fps = 10)
 
-col_name
-parameter_df %>% 
-  select(-alpha_hat) %>% 
+
+## ハイパーパラメータa,bの推移
+# クラスタ番号kを指定
+coluster_num <- 1
+
+# 作図
+trace_parameter_df %>% 
   pivot_longer(
-    cols = -c(k, Iter), 
+    cols = -c(cluster, Iteration), 
     names_to = "parameter", 
     names_ptypes = list(parameter = factor()), 
     values_to = "value"
   ) %>% 
-  ggplot(aes(parameter, value, color = k)) + 
-    geom_line()
+  filter(cluster == coluster_num) %>% 
+  ggplot(aes(Iteration, value, color = parameter)) + 
+    geom_line() + # 垂直線
+    labs(title = "Poisson mixture model:Gibbs sampling") # ラベル
+
+
