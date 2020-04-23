@@ -36,13 +36,13 @@ tibble(x = x_n) %>%
 # パラメータの設定 ----------------------------------------------------------------
 
 # 試行回数
-Iter <- 50
+MaxIter <- 50
 
 # ハイパーパラメータa,bの初期値を指定
 a <- 1
 b <- 1
 
-# lambda_k(の期待値)の初期値をランダムに設定
+# lambda(の期待値)の初期値をランダムに設定
 tmp_lambda <- seq(0, 1, by = 0.01) %>% 
   sample(size = K, replace = TRUE)
 E_lambda_k    <- tmp_lambda / sum(tmp_lambda) # 正規化
@@ -66,16 +66,16 @@ E_s_nk <- matrix(0, nrow = N, ncol = K)
 hat_a_k <- rep(0, K)
 hat_b_k <- rep(0, K)
 
-# 推移の確認用
-trace_a <- matrix(0, nrow = Iter + 1, ncol = K)
-trace_b <- matrix(0, nrow = Iter + 1, ncol = K)
-trace_alpha <- matrix(0, nrow = Iter + 1, ncol = K)
+# ハイパーパラメータの推定値の推移の確認用
+trace_a <- matrix(0, nrow = MaxIter + 1, ncol = K)
+trace_b <- matrix(0, nrow = MaxIter + 1, ncol = K)
+trace_alpha <- matrix(0, nrow = MaxIter + 1, ncol = K)
 # 初期値を代入
 trace_a[1, ] <- a
 trace_b[1, ] <- b
 trace_alpha[1, ] <- alpha_k
 
-for(i in 1:Iter) {
+for(i in 1:MaxIter) {
   
   for(n in 1:N) {
     
@@ -89,7 +89,7 @@ for(i in 1:Iter) {
   
   for(k in 1:K) {
     
-    # ハイパーパラメータa_hat,b_hatを計算:式(4.55)
+    # ハイパーパラメータa_hat_k,b_hat_kを計算:式(4.55)
     hat_a_k[k] <- sum(E_s_nk[, k] * x_n) + a
     hat_b_k[k] <- sum(E_s_nk[, k]) + b
     
@@ -101,21 +101,20 @@ for(i in 1:Iter) {
   # ハイパーパラメータalpha_hatを計算:式(4.58)
   hat_alpha_k <- apply(E_s_nk, 2, sum) + alpha_k
   
-  # 対数をとったpi_kの期待値を計算:式(4.62)
+  # 対数をとったpiの期待値を計算:式(4.62)
   E_ln_pi_k <- digamma(hat_alpha_k) - digamma(sum(hat_alpha_k))
   
   # 推移の確認用に推定結果を保存
   trace_a[i + 1, ] <- hat_a_k
   trace_b[i + 1, ] <- hat_b_k
   trace_alpha[i + 1, ] <- hat_alpha_k
-  
 }
 
 
 # 結果の確認 -------------------------------------------------------------------
 
 ## lambdaの近似事後分布
-# データフレームを作成
+# 作図用のデータフレームを作成
 lambda_df <- tibble()
 for(k in 1:K) {
   # データフレームに変換
@@ -133,13 +132,13 @@ ggplot(lambda_df, aes(lambda, density, color = cluster)) +
   geom_line() + # 折れ線グラフ
   scale_color_manual(values = c("#00A968", "orange")) + # グラフの色(不必要)
   geom_vline(xintercept = lambda_truth, color = "pink", linetype = "dashed") + # 垂直線
-  labs(title = "Poisson mixture model:variational inference", 
+  labs(title = "Poisson Mixture Model:Variational Inference", 
        subtitle = paste0("a_hat=(", paste0(round(hat_a_k, 1), collapse = ", "), 
                          "), b_hat=(", paste0(round(hat_b_k, 1), collapse = ", "), ")")) # ラベル
 
 
-## piの近似事後分布(K=2のときのみ可)
-# データフレームを作成
+## piの近似事後分布(K=2のときのみ可能)
+# 作図用のデータフレームを作成
 pi_df <- tibble()
 for(k in 1:K) {
   # データフレームに変換
@@ -157,7 +156,7 @@ ggplot(pi_df, aes(pi, density, color = cluster)) +
   geom_line() + # 折れ線グラフ
   scale_color_manual(values = c("#00A968", "orange")) + # グラフの色(不必要)
   geom_vline(xintercept = pi_truth, color = "pink", linetype = "dashed") + # 垂直線
-  labs(title = "Poisson mixture model:variational inference", 
+  labs(title = "Poisson Mixture Model:Variational Inference", 
        subtitle = paste0("alpha_hat=(", paste0(round(hat_alpha_k, 1), collapse = ", "), ")")) # ラベル
 
 
@@ -167,7 +166,7 @@ ggplot(pi_df, aes(pi, density, color = cluster)) +
 ## lambdaの近似事後分布
 # 作図用のデータフレームを作成
 trace_lambda_long <- tibble()
-for(i in 1:(Iter + 1)) {
+for(i in 1:(MaxIter + 1)) {
   for(k in 1:K) {
     # データフレームに変換
     tmp_lambda_df <- tibble(
@@ -187,17 +186,17 @@ graph_lambda <- ggplot(trace_lambda_long, aes(lambda, density, color = cluster))
   scale_color_manual(values = c("#00A968", "orange")) + # グラフの色(不必要)
   geom_vline(xintercept = lambda_truth, color = "pink", linetype = "dashed") + # 垂直線
   transition_manual(Iteration) + # フレーム
-  labs(title = "Poisson mixture model:variational inference", 
+  labs(title = "Poisson Mixture Model:Variational Inference", 
        subtitle = "i={current_frame}") # ラベル
   
 # gif画像を作成
-animate(graph_lambda, nframes = Iter + 1, fps = 5)
+animate(graph_lambda, nframes = MaxIter + 1, fps = 5)
 
 
 ## piの近似事後分布(K=2のときのみ可)
 # 作図用のデータフレームを作成
 trace_pi_long <- tibble()
-for(i in 1:(Iter + 1)) {
+for(i in 1:(MaxIter + 1)) {
   for(k in 1:K) {
     # データフレームに変換
     tmp_pi_df <- tibble(
@@ -217,11 +216,11 @@ graph_pi <- ggplot(trace_pi_long, aes(pi, density, color = cluster)) +
   scale_color_manual(values = c("#00A968", "orange")) + # グラフの色(不必要)
   geom_vline(xintercept = pi_truth, color = "pink", linetype = "dashed") + # 垂直線
   transition_manual(Iteration) + # フレーム
-  labs(title = "Poisson mixture model:variational inference", 
+  labs(title = "Poisson Mixture Model:Variational Inference", 
        subtitle = "i={current_frame}") # ラベル
 
 # gif画像を作成
-animate(graph_pi, nframes = Iter + 1, fps = 5)
+animate(graph_pi, nframes = MaxIter + 1, fps = 5)
 
 
 
@@ -231,7 +230,7 @@ animate(graph_pi, nframes = Iter + 1, fps = 5)
 # データフレームに変換
 trace_a_wide <- cbind(
   as.data.frame(trace_a), 
-  Iteration = 1:(Iter + 1)
+  Iteration = 1:(MaxIter + 1)
 )
 
 # long型に変換
@@ -247,7 +246,7 @@ trace_a_long <- pivot_longer(
 # 作図
 ggplot(trace_a_long, aes(Iteration, value, color = cluster)) + 
   geom_line() + 
-  labs(title = "Poisson mixture model:variational inference", 
+  labs(title = "Poisson Mixture Model:Variational Inference", 
        subtitle = expression(hat(a)))
 
 
@@ -255,7 +254,7 @@ ggplot(trace_a_long, aes(Iteration, value, color = cluster)) +
 # データフレームに変換
 trace_b_wide <- cbind(
   as.data.frame(trace_a), 
-  Iteration = 1:(Iter + 1)
+  Iteration = 1:(MaxIter + 1)
 )
 
 # long型に変換
@@ -271,7 +270,7 @@ trace_b_long <- pivot_longer(
 # 作図
 ggplot(trace_b_long, aes(Iteration, value, color = cluster)) + 
   geom_line() + 
-  labs(title = "Poisson mixture model:variational inference", 
+  labs(title = "Poisson Mixture Model:Variational Inference", 
        subtitle = expression(hat(b)))
 
 
@@ -279,7 +278,7 @@ ggplot(trace_b_long, aes(Iteration, value, color = cluster)) +
 # データフレームに変換
 trace_alpha_wide <- cbind(
   as.data.frame(trace_alpha), 
-  Iteration = 1:(Iter + 1)
+  Iteration = 1:(MaxIter + 1)
 )
 
 # long型に変換
@@ -295,7 +294,7 @@ trace_alpha_long <- pivot_longer(
 # 作図
 ggplot(trace_alpha_long, aes(Iteration, value, color = cluster)) + 
   geom_line() + 
-  labs(title = "Poisson mixture model:variational inference", 
+  labs(title = "Poisson Mixture Model:Variational Inference", 
        subtitle = expression(hat(alpha)))
 
 
