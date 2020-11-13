@@ -85,7 +85,7 @@ for(i in 1:5) {
 ggplot() + 
   geom_line(data = smp_model_df, aes(x, y, color = smp_num)) + # 事前分布からサンプリングwによるモデル
   geom_line(data = model_df, aes(x, y), color = "blue", linetype = "dotted") + # 観測モデル
-  ylim(min(min(smp_x_n), min(y_line)), max(max(smp_x_n), max(y_line))) + 
+  ylim(min(min(y_1n), min(y_line)), max(max(y_1n), max(y_line))) + 
   geom_line() + 
   labs(title = "Sampling from Piror Distribution")
 
@@ -113,7 +113,7 @@ ggplot() +
   geom_line(data = smp_model_df, aes(x, y, color = smp_num)) + # 事後分布からサンプリングしたwによるモデル
   geom_line(data = model_df, aes(x, y), color = "blue", linetype = "dotted") + # 観測モデル
   geom_point(data = sample_df, aes(x, y)) + # 観測データ
-  ylim(min(min(smp_x_n), min(y_line)), max(max(smp_x_n), max(y_line))) + 
+  ylim(min(min(y_1n), min(y_line)), max(max(y_1n), max(y_line))) + 
   labs(title = "Sampling from Posterior Distribution", 
        subtitle = paste0("M=", M))
   
@@ -144,7 +144,7 @@ ggplot() +
   geom_line(data = predict_df, aes(x, minus_sigma_y), color = "#00A968", linetype = "dashed") + # 予測分布の期待値-sigma
   geom_line(data = model_df, aes(x, y), color = "blue", linetype = "dotted") + # 観測モデル
   geom_point(data = sample_df, aes(x, y)) + # 観測データ
-  ylim(min(min(smp_x_n), min(y_line)), max(max(smp_x_n), max(y_line))) + 
+  ylim(min(min(y_1n), min(y_line)), max(max(y_1n), max(y_line))) + 
   labs(title = "Predictive Distribution", 
        subtitle = paste0("M=", M, ", N=", N), 
        y = "y")
@@ -261,7 +261,7 @@ predict_graph <- ggplot() +
   geom_line(data = model_df, aes(x, y), color = "blue", linetype = "dotted") + # 観測モデル
   geom_point(data = sample_df, aes(x, y)) + # 観測データ
   transition_manual(iteration) + # フレーム
-  ylim(min(min(smp_x_n), min(y_line)), max(max(smp_x_n), max(y_line))) + 
+  ylim(min(min(y_1n), min(y_line)), max(max(y_1n), max(y_line))) + 
   labs(title = "Predictive Distribution", 
        subtitle = paste("M=", M, ", N={current_frame}", sep = ""), 
        y = "y")
@@ -376,7 +376,7 @@ predict_graph <- ggplot() +
   geom_line(data = model_df, aes(x, y), color = "blue", linetype = "dotted") + # 観測モデル
   geom_point(data = sample_df, aes(x, y)) + # 観測データ
   transition_manual(iteration) + # フレーム
-  ylim(min(min(smp_x_n), min(y_line)), max(max(smp_x_n), max(y_line))) + 
+  ylim(min(min(y_1n), min(y_line)), max(max(y_1n), max(y_line))) + 
   labs(title = "Predictive Distribution", 
        subtitle = paste0("M={current_frame}", ", N=", N), 
        y = "y")
