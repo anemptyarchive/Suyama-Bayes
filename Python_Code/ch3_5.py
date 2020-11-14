@@ -322,6 +322,7 @@ fig = plt.figure(figsize=(12, 8))
 fig.suptitle('Predict Distribution', fontsize=20)
 ax = fig.add_subplot(1, 1, 1)
 
+# 作図処理を関数として定義
 def update(n):
     
     # 前フレームのグラフを初期化
@@ -330,9 +331,9 @@ def update(n):
     # nフレーム目のグラフを描画
     ax.plot(x_line, mu_star_arr[n], color='orange', label='predict') # 予測分布の期待値
     ax.plot(x_line, mu_star_arr[n] + np.sqrt(sigma2_star_arr[n]), 
-                          color='#00A968', linestyle='--', label='$+\sigma$') # +sigma
+            color='#00A968', linestyle='--', label='$+\sigma$') # +sigma
     ax.plot(x_line, mu_star_arr[n] - np.sqrt(sigma2_star_arr[n]), 
-                          color='#00A968', linestyle='--', label='$-\sigma$') # -sigma
+            color='#00A968', linestyle='--', label='$-\sigma$') # -sigma
     ax.plot(x_line, y_line, linestyle=':', color='blue', label='model') # 観測モデル
     ax.scatter(smp_x_n[0:n+1], y_1n[0, 0:n+1].flatten(), color='chocolate') # 観測データ
     
@@ -458,6 +459,7 @@ fig = plt.figure(figsize=(12, 8))
 fig.suptitle('Predict Distribution', fontsize=20)
 ax = fig.add_subplot(1, 1, 1)
 
+# 作図処理を関数として定義
 def update(m):
     
     # 前フレームのグラフを初期化
@@ -466,9 +468,9 @@ def update(m):
     # nフレーム目のグラフを描画
     ax.plot(x_line, mu_star_arr[m], color='orange', label='predict') # 予測分布の期待値
     ax.plot(x_line, mu_star_arr[m] + np.sqrt(sigma2_star_arr[m]), 
-                          color='#00A968', linestyle='--', label='$+\sigma$') # +sigma
+            color='#00A968', linestyle='--', label='$+\sigma$') # +sigma
     ax.plot(x_line, mu_star_arr[m] - np.sqrt(sigma2_star_arr[m]), 
-                          color='#00A968', linestyle='--', label='$-\sigma$') # -sigma
+            color='#00A968', linestyle='--', label='$-\sigma$') # -sigma
     ax.plot(x_line, y_line, linestyle=':', color='blue', label='model') # 観測モデル
     ax.scatter(smp_x_n, y_1n.flatten(), color='chocolate') # 観測データ
     
@@ -484,6 +486,89 @@ def update(m):
 # gif画像を作成
 ani = animation.FuncAnimation(fig, update, frames=len(mu_star_arr), interval=200)
 ani.save("ch3_5_predict_overfit_m.gif")
+
+
+#%%
+
+# クラスとして実装：未完
+
+'''
+作図メソッドにx_vector()を組み込むのが面倒だった
+'''
+
+# 線形回帰の実装
+class LinearRegression:
+    def __init__(self, y_1n, x_mn, lmd):
+        # 観測データ
+        self.y_1n = y_1n # 出力値
+        self.x_mn = x_mn # 入力値
+        
+        # 観測モデルのパラメータ
+        self.lmd = lmd # ノイズの精度:(分散の逆数)
+    
+    # 事後分布のパラメータ更新メソッド
+    def update_posterior_params(self, m_m, sigma_mm):
+        # 事前分布
+        self.M = len(m_m) # 次元数:(モデルのパラメータ数)
+        self.m_m = m_m # 平均パラメータ
+        self.lambda_mm = np.linalg.inv(sigma_mm**2) # 精度行列パラメータ
+        
+        # 事後分布のパラメータを計算
+        old_lambda_mm = self.lambda_mm.copy()
+        self.lambda_mm += lmd * np.dot(self.x_mn, self.x_mn.T)
+        tmp_m_m = self.lmd * np.dot(self.x_mn, self.y_1n.T)
+        tmp_m_m += np.dot(old_lambda_mm, self.m_m)
+        self.m_m = np.dot(np.linalg.inv(self.lambda_mm), tmp_m_m)
+        
+    # 予測分布のパラメータ更新メソッド
+    def update_predict_params(self, x_star_mn):
+        # 未知のデータ
+        self.N = x_star_mn.shape[1] # データ数
+        self.x_star_mn = x_star_mn # 入力値
+        
+        # 予測分布のパラメータを計算
+        self.sigma2_star_n = np.repeat(1 / self.lmd, self.N)
+        for n in range(N):
+            self.sigma2_star_n[n] += self.x_star_mn[:, n].T.dot(np.linalg.inv(self.lambda_mm)).dot(self.x_star_mn[:, n])
+        self.mu_star_n = np.dot(self.m_m.T, self.x_star_mn).flatten()
+    
+    # 予測分布の作図メソッド
+    def plot_predict_distribution(self, x_line=None, y_line=None):
+        # 予測分布を作図
+        fig = plt.figure(figsize=(12, 8))
+        plt.plot(self.x_star_mn[1], self.mu_star_n, color='orange', label='predict') # 予測分布の期待値
+        plt.plot(self.x_star_mn[1], self.mu_star_n + np.sqrt(self.sigma2_star_n), 
+                 color='#00A968', linestyle='--', label='$+\sigma$') # 予測分布の期待値+sigma
+        plt.plot(self.x_star_mn[1], self.mu_star_n - np.sqrt(self.sigma2_star_n), 
+                 color='#00A968', linestyle='--', label='$-\sigma$') # 予測分布の期待値-sigma
+        #if x_line != None:これじゃムリ
+        #    plt.plot(x_line, y_line, linestyle=':', color='blue', label='model') # 観測モデル
+        #plt.scatter(x_n, self.y_1n, color='chocolate') # 観測データ
+        plt.suptitle('Predict Distribution', fontsize=20)
+        plt.title('M=' + str(self.M) + ', N=' + str(self.N), loc='left')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.grid()
+        plt.legend()
+        plt.show()
+
+#%%
+
+# 事前分布のパラメータを指定
+N = 50
+M = 4
+m_m = np.zeros((M, 1))
+sigma_mm = np.identity(M)
+
+# xのベクトル作成
+x_mn = x_vector(smp_x_n, M)
+x_mline = x_vector(x_line, M)
+
+# 推論
+model = LinearRegression(y_1n, x_mn, lmd)
+model.update_posterior_params(m_m, sigma_mm)
+model.update_predict_params(x_mline)
+model.plot_predict_distribution(x_line, y_line)
 
 
 #%%
