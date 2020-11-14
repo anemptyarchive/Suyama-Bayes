@@ -101,7 +101,7 @@ fig = plt.figure(figsize=(12, 8))
 for i in range(smp_size):
     plt.plot(x_line, smp_model_arr[i], label=str(i+1)) # 事前分布からサンプリングしたwによるモデル
 plt.plot(x_line, y_line, color='blue', linestyle='dotted', label='model') # 観測モデル
-plt.title('Sampling from Piror Distribution', fontsize=20)
+plt.title('Sampling from Prior Distribution', fontsize=20)
 plt.xlabel('x')
 plt.ylabel('y')
 plt.grid()
