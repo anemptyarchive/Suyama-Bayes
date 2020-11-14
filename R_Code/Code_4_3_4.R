@@ -29,38 +29,36 @@ x_n <- rpois(n = N, lambda = apply(lambda_truth^t(s_nk), 2, prod))
 summary(x_n)
 tibble(x = x_n) %>% 
   ggplot(aes(x = x)) + 
-  geom_bar(fill = "#56256E") + 
-  labs(title = "Histogram")
+    geom_bar(fill = "#56256E") + 
+    labs(title = "Histogram")
 
 
 # パラメータの設定 ----------------------------------------------------------------
 
-# 試行回数
+# 試行回数を指定
 MaxIter <- 50
+
+# ハイパーパラメータa,bを指定
+a <- 1
+b <- 1
+alpha_k <- rep(2, K)
 
 # 潜在変数Sの初期値をランダムに設定
 s_nk <- rmultinom(n = N, size = 1, prob = rep(1, K)) %>% 
   t()
 
-# ハイパーパラメータa,bを指定
-a <- 2
-b <- 2
-alpha_k <- rep(2, K)
+# Xに関する統計量を計算
+hat_a_k <- apply(s_nk * x_n, 2, sum) + a
+hat_b_k <- apply(s_nk, 2, sum) + b
+hat_alpha_k <- apply(s_nk, 2, sum) + alpha_k
+
 
 # 崩壊型ギブスサンプリング ------------------------------------------------------------
 
 # 受け皿を用意
-eta_nk <- matrix(0, nrow = N, ncol = K)
-hat_a_k.n <- rep(0, K)
-hat_b_k.n <- rep(0, K)
-hat_alpha_k.n <- rep(0, K)
+eta_k.n <- rep(0, K)
 hat_r_k <- rep(0, K)
 hat_p_k <- rep(0, K)
-
-# 
-hat_a_k.n <- apply(s_nk * x_n, 2, sum) + a
-hat_b_k.n <- apply(s_nk, 2, sum) + b
-hat_alpha_k.n <- apply(s_nk, 2, sum) + alpha_k
 
 
 # ハイパーパラメータの推定値の推移の確認用
@@ -73,8 +71,19 @@ trace_b[1, ] <- hat_b_k.n
 trace_alpha[1, ] <- hat_alpha_k.n
 
 for(i in 1:MaxIter) {
+   
+  # 初期化
+  new_a_k <- rep(0, K)
+  new_b_k <- rep(0, K)
+  new_alpha_k <- rep(0, K)
   
   for(n in 1:N) {
+    
+    # 更新した統計量を移す
+    hat_a_k.n <- hat_a_k
+    hat_b_k.n <- hat_b_k
+    hat_alpha_k.n <- hat_alpha_k
+
     
     # x_nに関する統計量を除去:式(4.82),(4.83)
     hat_a_k.n <- hat_a_k.n - s_nk[n, ] * x_n[n]
@@ -93,23 +102,28 @@ for(i in 1:MaxIter) {
     }
     
     # パラメータeta_nを計算:式(4.75)
-    tmp_eta <- hat_alpha_k.n
-    eta_nk[n, ] <- tmp_eta / sum(tmp_eta)
+    eta_k.n <- hat_alpha_k.n / sum(hat_alpha_k.n)
     
     # 潜在変数s_nをサンプル:式(4.74)
     s_nk[n, ] <- rmultinom(n = 1, size = 1, prob = eta_nk[n, ]) %>% 
       as.vector()
     
     # x_nに関する統計量を追加:式(4.82),(4.83)
-    hat_a_k.n <- hat_a_k.n + s_nk[n, ] * x_n[n]
-    hat_b_k.n <- hat_b_k.n + s_nk[n, ]
-    hat_alpha_k.n <- hat_alpha_k.n + s_nk[n, ]
+    new_a_k <- hat_a_k + s_nk[n, ] * x_n[n]
+    new_b_k <- hat_b_k + s_nk[n, ]
+    new_alpha_k <- hat_alpha_k + s_nk[n, ]
   }
   
+  #
+  # 更新
+  hat_a_k <- new_a_k
+  hat_b_k <- new_b_k
+  hat_alpha_k <- new_alpha_k
+  
   # 推移の確認用に推定結果を保存
-  trace_a[i + 1, ] <- hat_a_k.n
-  trace_b[i + 1, ] <- hat_b_k.n
-  trace_alpha[i + 1, ] <- hat_alpha_k.n
+  trace_a[i + 1, ] <- hat_a_k
+  trace_b[i + 1, ] <- hat_b_k
+  trace_alpha[i + 1, ] <- hat_alpha_k
 }
 
 

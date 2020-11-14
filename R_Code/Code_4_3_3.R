@@ -8,24 +8,24 @@ library(gganimate)
 
 # 真の観測モデルの設定 ----------------------------------------------------------------
 
-# (観測)データ数を指定
+# (観測)データ数Nを指定
 N <- 100
 
-# 真のパラメータを指定
+# 真のパラメータlambda,piを指定
 lambda_truth <- c(5, 25)
 pi_truth <- c(0.3, 0.7)
 
-# クラスタ数
+# クラスタ数K
 K <- length(lambda_truth)
 
-# クラスタ(潜在変数)を生成
+# クラスタ(潜在変数)Sを生成
 s_nk <- rmultinom(n =  N, size = 1, prob = pi_truth) %>% 
   t()
 
-# (観測)データXを生成
+# (観測)データを生成
 x_n <- rpois(n = N, lambda = apply(lambda_truth^t(s_nk), 2, prod))
 
-# 観測データを確認
+# 観測データXを確認
 summary(x_n)
 tibble(x = x_n) %>% 
   ggplot(aes(x = x)) + 

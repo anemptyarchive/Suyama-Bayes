@@ -192,7 +192,7 @@ ggplot(model_df, aes(x, y)) +
        subtitle = paste0("w = (", paste0(round(w_m, 1), collapse = ', '), ")"))
 
 
-# サンプルサイズを指定
+# サンプルサイズを指定：(試行回数)
 N <- 100
 
 # 事前分布のパラメータを指定
@@ -326,7 +326,7 @@ ggplot() +
        subtitle = paste0("M=", M_truth, ", sigma=", round(sqrt(1 / lambda), 1)))
 
 
-# 事前分布のパラメータを指定
+# パラメータ(次元)数の最大値を指定：(試行回数)
 max_M <- 15
 
 
@@ -334,7 +334,7 @@ max_M <- 15
 predict_df <- tibble()
 for(m in 1:max_M) {
   
-  # 事前分布のパラメータを生成
+  # 事前分布のパラメータを設定
   m_m <- matrix(rep(0, m), nrow = m, ncol = 1)
   sigma_mm <- diag(m)
   lambda_mm <- solve(sigma_mm^2)

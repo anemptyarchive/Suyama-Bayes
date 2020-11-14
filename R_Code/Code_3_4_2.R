@@ -86,7 +86,8 @@ posterior_df <- tibble(
 # 作図
 ggplot() + 
   geom_contour(data = posterior_df, aes(x, y, z = density, color = ..level..)) + # 精度の期待値を用いた分布
-  geom_contour(data = model_df, aes(x, y, z = density, color = ..level..), alpha = 0.5, linetype = "dashed") + # 観測モデル
+  geom_contour(data = model_df, aes(x, y, z = density, color = ..level..), 
+               alpha = 0.5, linetype = "dashed") + # 観測モデル
   geom_point(data = mu_df, aes(x = x, y = y), color = "red", shape = 3, size = 5) + # 平均値
   labs(title = "Multivariate Gaussian Distribution", 
        subtitle = paste0("N=", N, ", mu=(", paste(round(mu_d, 1), collapse = ", "), ")", 
@@ -117,7 +118,8 @@ predict_df <- cbind(
 # 作図
 ggplot() + 
   geom_contour(data = predict_df, aes(x, y, z = density, color = ..level..)) + # 予測分布
-  geom_contour(data = model_df, aes(x, y, z = density, color = ..level..), alpha = 0.5, linetype = "dashed") + # 観測モデル
+  geom_contour(data = model_df, aes(x, y, z = density, color = ..level..), 
+               alpha = 0.5, linetype = "dashed") + # 観測モデル
   geom_point(data = mu_df, aes(x = x, y = y), color = "red", shape = 3, size = 5) + # 平均パラメータ
   labs(title = "Multivariate Student's t Distribution", 
        subtitle = paste0("N=", N, ", mu_s=(", paste(round(mu_s_d, 1), collapse = ", "), ")", 
@@ -260,10 +262,11 @@ for(i in 1:N) {
 
 # 事後分布の期待値を用いた分布を作図
 posterior_graph <- ggplot() + 
-  geom_contour(data = posterior_df, aes(x, y, z = density, color = ..level..)) +  # 精度の期待値を用いた分布
+  geom_contour(data = posterior_df, aes(x, y, z = density, color = ..level..)) + # 精度の期待値を用いた分布
   geom_point(data = sample_df, aes(x = x, y = y)) + # 観測データ
-  geom_contour(data = model_df, aes(x, y, z = density, color = ..level..), alpha = 0.5, linetype = "dashed") + # 観測モデル
-  geom_point(data = mu_df, aes(x = x, y = y), color = "red", shape = 3, size = 5) +  # 平均パラメータ
+  geom_contour(data = model_df, aes(x, y, z = density, color = ..level..), 
+               alpha = 0.5, linetype = "dashed") + # 観測モデル
+  geom_point(data = mu_df, aes(x = x, y = y), color = "red", shape = 3, size = 5) + # 平均パラメータ
   transition_manual(iteration) +  # フレーム
   labs(title = "Multivariate Gaussian Distribution", 
        subtitle = "N={current_frame}", 
@@ -276,9 +279,10 @@ animate(posterior_graph, nframes = N + 1, fps = 5)
 
 # 予測分布を作図
 predict_graph <- ggplot() + 
-  geom_contour(data = predict_df, aes(x, y, z = density, color = ..level..)) +  # 予測分布
+  geom_contour(data = predict_df, aes(x, y, z = density, color = ..level..)) + # 予測分布
   geom_point(data = sample_df, aes(x = x, y = y)) + # 観測データ
-  geom_contour(data = model_df, aes(x, y, z = density, color = ..level..), alpha = 0.5, linetype = "dashed") + # 観測モデル
+  geom_contour(data = model_df, aes(x, y, z = density, color = ..level..), 
+               alpha = 0.5, linetype = "dashed") + # 観測モデル
   geom_point(data = mu_df, aes(x = x, y = y), color = "red", shape = 3, size = 5) +  # 平均パラメータ
   transition_manual(iteration) +  # フレーム
   labs(title = "Multivariate Student's t Distribution", 
