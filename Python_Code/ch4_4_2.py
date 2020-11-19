@@ -47,7 +47,7 @@ x_nd = np.array([
 #%%
 
 # 作図用の格子状の点を作成
-X_line, Y_line = np.meshgrid(np.arange(-10.0, 10.0, 0.1), np.arange(-10.0, 10.0, 0.1))
+X_line, Y_line = np.meshgrid(np.arange(-10.0, 10.0, 0.2), np.arange(-10.0, 10.0, 0.2))
 x_line = X_line.flatten()
 y_line = Y_line.flatten()
 
@@ -103,8 +103,14 @@ print(pi_k)
 #%%
 
 # 試行回数を指定
-MaxIter = 3000
+MaxIter = 300
 
+# 推移の確認用の受け皿
+trace_s_in = np.zeros((MaxIter, N))
+trace_mu_ikd = np.zeros((MaxIter+1, K, D))
+trace_lambda_ikdd = np.zeros((MaxIter+1, K, D, D))
+trace_mu_ikd[0] = mu_kd.copy()
+trace_lambda_ikdd[0] = lambda_kdd.copy()
 # ギブスサンプリング
 for i in range(MaxIter):
     
@@ -162,6 +168,11 @@ for i in range(MaxIter):
     pi_sampler = dirichlet(alpha=alpha_hat_k)
     pi_k = pi_sampler.rvs(size=1).flatten()
     
+    # 値を記録
+    _, trace_s_in[i] = np.where(s_nk == 1)
+    trace_mu_ikd[i+1] = mu_kd.copy()
+    trace_lambda_ikdd[i+1] = lambda_kdd.copy()
+    
     # 動作確認
     print(str(i+1) + ' (' + str(np.round((i + 1) / MaxIter * 100, 1)) + '%)')
 
@@ -192,8 +203,72 @@ for k in range(K):
     plt.scatter(x_nd[k_idx, 0], x_nd[k_idx, 1], label='cluster'+str(k+1)) # 観測データ
 plt.scatter(mu_true_kd[:, 0], mu_true_kd[:, 1], marker='+', s=100, alpha=0.5) # 真の平均
 plt.suptitle('Gibbs Sampling', fontsize=20)
-plt.title('K=' + str(K) + ', N=' + str(N), loc='left', fontsize=20)
+plt.title('K=' + str(K) + ', N=' + str(N) + ', iter:' + str(MaxIter), loc='left', fontsize=20)
+plt.xlabel('$x_{1}$')
+plt.ylabel('$x_{2}$')
 plt.show()
+
+#%%
+
+# gif画像で推移の確認
+
+# 追加ライブラリ
+import matplotlib.animation as animation
+
+
+#%%
+
+# 観測モデルを計算
+Z_ikline = np.zeros((MaxIter+1, K, *X_line.shape))
+for i in range(MaxIter + 1):
+    z_kline = np.empty((K, len(x_line)))
+    for k in range(K):
+        tmp_z_line = [
+            multivariate_normal.pdf(
+                (x, y), mean=trace_mu_ikd[i, k], cov=np.linalg.inv(trace_lambda_ikdd[i, k])
+                ) for x, y in zip(x_line, y_line)
+            ]
+        z_kline[k] = tmp_z_line.copy()
+    Z_ikline[i] = z_kline.reshape((K, *X_line.shape))
+    
+    # 動作確認
+    print(str(i) + ' (' + str(np.round((i) / (MaxIter) * 100, 1)) + '%)')
+
+#%%
+
+# グラフを初期化
+plt.cla()
+
+# グラフを作成
+fig = plt.figure(figsize=(12, 12))
+fig.suptitle('Gibbs Sampling', fontsize=20)
+ax = fig.add_subplot(1, 1, 1)
+
+# 作図処理を関数として定義
+def update(i):
+    
+    # 前フレームのグラフを初期化
+    ax.cla()
+    
+    # nフレーム目のグラフを描画
+    for k in range(K):
+        ax.contour(X_line, Y_line, Z_ikline[i, k]) # 観測モデル
+        ax.contour(X_line, Y_line, Z_true_kline[k], linestyles='dotted', alpha=0.5) # 真の観測モデル
+        if i > 0:
+            k_idx = np.where(trace_s_in[i-1] == k) # クラスタkのインデックスを取得
+            ax.scatter(x_nd[k_idx, 0], x_nd[k_idx, 1], label='cluster'+str(k+1)) # 観測データ
+    if i == 0:
+        ax.scatter(x_nd[:, 0], x_nd[:, 1]) # 観測データ
+    ax.scatter(mu_true_kd[:, 0], mu_true_kd[:, 1], marker='+', s=100, alpha=0.5) # 真の平均
+    
+    # グラフの設定
+    ax.set_title('K=' + str(K) + ', N=' + str(N) + ', iter:' + str(i+1), loc='left', fontsize=20)
+    ax.set_xlabel('$x_{1}$')
+    ax.set_ylabel('$x_{2}$')
+
+# gif画像を作成
+ani = animation.FuncAnimation(fig, update, frames=MaxIter + 1, interval=100)
+ani.save("ch4_4_2_trace.gif")
 
 #%%
 
