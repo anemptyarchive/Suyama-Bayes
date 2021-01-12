@@ -127,7 +127,7 @@ for(i in 1:MaxIter) {
   w_hat_ddk <- array(0, dim = c(D, D, K))
   alpha_hat_k <- rep(0, K)
   
-  # 潜在変数変数のパラメータを計算:式(4.94)
+  # 潜在変数のパラメータを計算:式(4.94)
   for(k in 1:K) {
     tmp_term_dn <- t(x_nd) - mu_kd[k, ]
     tmp_eta_n <- diag(
@@ -256,12 +256,14 @@ for(k in 1:K) {
 # muの推移を確認
 ggplot(trace_mu_df, aes(x = iteration, y = value, color = label)) + 
   geom_line() + 
-  labs(title = expression(bold(mu)))
+  labs(title = "Gibbs Sampling", 
+       subtitle = expression(bold(mu)))
 
 # lambdaの推移を確認
 ggplot(trace_lambda_df, aes(x = iteration, y = value, color = label)) + 
   geom_line() + 
-  labs(title = expression(bolditalic(Lambda)))
+  labs(title = "Gibbs Sampling", 
+       subtitle = expression(bolditalic(Lambda)))
 
 
 # gif画像で推移を確認 -------------------------------------------------------------

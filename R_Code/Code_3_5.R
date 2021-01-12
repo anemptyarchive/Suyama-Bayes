@@ -87,7 +87,7 @@ ggplot() +
   geom_line(data = model_df, aes(x, y), color = "blue", linetype = "dotted") + # 観測モデル
   ylim(min(min(y_1n), min(y_line)), max(max(y_1n), max(y_line))) + 
   geom_line() + 
-  labs(title = "Sampling from Piror Distribution")
+  labs(title = "Sampling from Prior Distribution")
 
 
 # 事後分布の計算 -----------------------------------------------------------------
