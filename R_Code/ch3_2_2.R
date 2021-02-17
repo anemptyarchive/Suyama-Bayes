@@ -1,206 +1,249 @@
 
 # 3.2.2 カテゴリ分布の学習と予測 -------------------------------------------------------------------
 
-# 3.2.2 事後分布 -------------------------------------------------------------------
-
-
-# 利用パッケージ
+# 3.2.2項で利用するパッケージ
 library(tidyverse)
 
 
-## パラメーターの初期値を指定
-# 観測モデルのパラメータ
-pi_k_truth <- c(0.3, 0.5, 0.2)
+### 真のモデルの設定 -----
 
-# 事前分布のパラメータ
-alpha_k <- c(2, 2, 2)
+# 次元数:(固定)
+K <- 3
 
-# 試行回数
-N <- 50
+# 真のパラメータを指定
+pi_truth_k <- c(0.3, 0.5, 0.2)
 
-
-# 作図用のpiの値を満遍なく生成
-pi <- tibble(
-  pi_1 = rep(rep(seq(0, 1, by = 0.02), times = 51), times = 51), 
-  pi_2 = rep(rep(seq(0, 1, by = 0.02), each = 51), times = 51), 
-  pi_3 = rep(seq(0, 1, by = 0.02), each = 2601)
+# 観測モデル(カテゴリ分布)のデータフレームを作成
+model_df <- tibble(
+  k = 1:K, # 次元番号
+  prob = pi_truth_k # 確率
 )
 
-# 正規化
-pi <- pi / apply(pi, 1, sum)
-
-# 重複した組み合わせを除去(ハイスぺ機なら不要…)
-pi <- pi %>% 
-  mutate(pi_1 = round(pi_1, 3), pi_2 = round(pi_2, 3), pi_3 = round(pi_3, 3)) %>% 
-  count(pi_1, pi_2, pi_3) %>% 
-  select(-n) %>% 
-  as.matrix()
+# 観測モデルを作図
+ggplot(model_df, aes(x = k, y = prob)) + 
+  geom_bar(stat = "identity", position = "dodge", fill = "purple") + # 観測モデル
+  ylim(c(0, 1)) + # y軸の表示範囲
+  labs(title = "Catgorical Distribution", 
+       subtitle = paste0("pi=(", paste0(pi_truth_k, collapse = ", "), ")"))
 
 
-# 作図用のpiの値をランダムに生成
-#pi <- matrix(sample(seq(0, 1, 0.01), 90000, replace = TRUE), nrow = 3)
+### 観測データの生成 -----
 
-# 正規化
-#pi <- pi / apply(pi, 1, sum)
+# データ数を指定
+N <- 50
 
-
-# カテゴリ分布に従うデータを生成
-s_nk <- rmultinom(n = N, size = 1, prob = pi_k_truth) %>% 
+# (観測)データを生成
+s_nk <- rmultinom(n = N, size = 1, prob = pi_truth_k) %>% 
   t()
 
 # 観測データを確認
-apply(s_nk, 2, sum)
+colSums(s_nk)
+
+# 観測データのヒストグラムを作図
+tibble(k = 1:K, count = colSums(s_nk)) %>% 
+  ggplot(aes(x = k, y = count)) + 
+    geom_bar(stat = "identity", position = "dodge") + # (簡易)ヒストグラム
+    labs(title = "Observation Data", 
+         subtitle = paste0("N=", N, ", pi=(", paste0(pi_truth_k, collapse = ", "), ")"))
 
 
-# 事後分布のパラメータを計算
-alpha_k_hat <- apply(s_nk, 2, sum) + alpha_k
+### 事前分布の設定 -----
 
+# 事前分布のパラメータ
+alpha_k <- c(1, 1, 1)
 
-# 事後分布を計算
-posterior_df <- tibble(
-  x = pi[, 2] + (pi[, 3] / 2),  # 三角座標への変換
-  y = sqrt(3) * (pi[, 3] / 2),  # 三角座標への変換
-  C_D = lgamma(sum(alpha_k_hat)) - sum(lgamma(alpha_k_hat)),  # 正規化項(対数)
-  density = exp(C_D + apply((alpha_k_hat - 1) * log(t(pi)), 2, sum)) # 確率密度
+# 作図用のpiの値を満遍なく生成
+point_vec <- seq(0, 1, by = 0.025) # piがとり得る値
+n_point <- length(point_vec) # 点の数
+pi_point <- tibble(
+  pi_1 = rep(rep(point_vec, times = n_point), times = n_point), 
+  pi_2 = rep(rep(point_vec, each = n_point), times = n_point), 
+  pi_3 = rep(point_vec, each = n_point^2)
+)
+pi_point <- pi_point / rowSums(pi_point) # 正規化
+
+# 点を間引く(ハイスぺ機なら不要…)
+pi_point <- round(pi_point, 3) %>% # 値を丸め込み
+  dplyr::as_tibble() %>% # データフレームに変換
+  dplyr::distinct(pi_1, pi_2, pi_3) %>% # 重複を除去
+  as.matrix() # マトリクスに再変換
+
+# 作図用のpiの値をランダムに生成
+#pi_point <- seq(0, 1, 0.001) %>% # piがとり得る値
+#  sample(size = 90000, replace = TRUE) %>% 
+#  matrix(ncol = 3)
+#pi_point <- pi_point / rowSums(pi_point) # 正規化
+
+# 事後分布(ディリクレ分布)を計算
+prior_df <- tibble(
+  x = pi_point[, 2] + (pi_point[, 3] / 2), # 三角座標への変換
+  y = sqrt(3) * (pi_point[, 3] / 2), # 三角座標への変換
+  ln_C_dir = lgamma(sum(alpha_k)) - sum(lgamma(alpha_k)), # 正規化項(対数)
+  density = exp(ln_C_dir) * apply(t(pi_point)^(alpha_k - 1), 2, prod) # 確率密度
 )
 
-
-# piの真の値のプロット用データフレームを作成
-pi_truth_df <- tibble(
-  x = pi_k_truth[2] + (pi_k_truth[3] / 2),  # 三角座標への変換
-  y = sqrt(3) * (pi_k_truth[3] / 2),  # 三角座標への変換
-)
-
-# 作図
+# 事前分布を作図
 ggplot() + 
-  geom_point(data = posterior_df, aes(x, y, color = density)) + # 散布図
-  geom_point(data = pi_truth_df, aes(x, y), shape = 3, size = 5) + # piの真の値
-  scale_color_gradientn(colors = c("blue", "green", "yellow", "red")) + # プロットの色
+  geom_point(data = prior_df, aes(x = x, y = y, color = density)) + # 事前分布
+  scale_color_gradientn(colors = c("blue", "green", "yellow", "red")) + # 散布図のグラデーション
   scale_x_continuous(breaks = c(0, 1), 
                      labels = c("(1, 0, 0)", "(0, 1, 0)")) + # x軸目盛
   scale_y_continuous(breaks = c(0, 0.87), 
                      labels = c("(1, 0, 0)", "(0, 1, 0)")) + # y軸目盛
   coord_fixed(ratio = 1) + # 縦横比
   labs(title = "Dirichlet Distribution", 
-       subtitle = paste0("N=", N, ", alpha=(", paste(alpha_k_hat, collapse = ", "), ")"), 
+       subtitle = paste0("N=", N, ", alpha=(", paste(alpha_k, collapse = ", "), ")"), 
        x = expression(paste(pi[1], ", ", pi[2], sep = "")), 
-       y = expression(paste(pi[1], ", ", pi[3], sep = ""))) # ラベル
+       y = expression(paste(pi[1], ", ", pi[3], sep = "")))
 
 
-# 3.2.2 予測分布 ---------------------------------------------------------------
+### 事後分布の計算 -----
+
+# 事後分布のパラメータを計算
+alpha_hat_k <- colSums(s_nk) + alpha_k
 
 
-# 予測分布のパラメータを計算
-pi_k_hat <- alpha_k_hat / sum(alpha_k_hat)
-#pi_k_hat <- (apply(s_nk, 2, sum) + alpha_k) / sum(apply(s_nk, 2, sum) + alpha_k)
-
-# 作図用のsの値
-s_sk <- matrix(c(1, 0, 0, 0, 1, 0, 0, 0, 1), ncol = 3)
-
-# 予測分布を計算
-predict_df <- tibble(
-  k = seq(1, 3),  # 作図用の値
-  prob = apply(pi_k_hat^s_sk, 1, prod) # 確率
+# 事後分布(ディリクレ分布)を計算
+posterior_df <- tibble(
+  x = pi_point[, 2] + (pi_point[, 3] / 2), # 三角座標への変換
+  y = sqrt(3) * (pi_point[, 3] / 2), # 三角座標への変換
+  ln_C_dir = lgamma(sum(alpha_hat_k)) - sum(lgamma(alpha_hat_k)), # 正規化項(対数)
+  density = exp(ln_C_dir) * apply(t(pi_point)^(alpha_hat_k - 1), 2, prod) # 確率密度
 )
 
+# 真のパラメータのデータフレームを作成
+parameter_df <- tibble(
+  x = pi_truth_k[2] + (pi_truth_k[3] / 2), # 三角座標への変換
+  y = sqrt(3) * (pi_truth_k[3] / 2), # 三角座標への変換
+)
 
-# 作図
-ggplot(predict_df, aes(k, prob)) + 
-  geom_bar(stat = "identity", position = "dodge", fill = "#56256E") + # 棒グラフ
+# 事後分布を作図
+ggplot() + 
+  geom_point(data = posterior_df, aes(x = x, y = y, color = density)) + # 事後分布
+  geom_point(data = parameter_df, aes(x = x, y = y), shape = 4, size = 5) + # 真のパラメータ
+  scale_color_gradientn(colors = c("blue", "green", "yellow", "red")) + # 散布図のグラデーション
+  scale_x_continuous(breaks = c(0, 1), 
+                     labels = c("(1, 0, 0)", "(0, 1, 0)")) + # x軸目盛
+  scale_y_continuous(breaks = c(0, 0.87), 
+                     labels = c("(1, 0, 0)", "(0, 1, 0)")) + # y軸目盛
+  coord_fixed(ratio = 1) + # 縦横比
+  labs(title = "Dirichlet Distribution", 
+       subtitle = paste0("N=", N, ", alpha_hat=(", paste(alpha_hat_k, collapse = ", "), ")"), 
+       x = expression(paste(pi[1], ", ", pi[2], sep = "")), 
+       y = expression(paste(pi[1], ", ", pi[3], sep = "")))
+
+
+### 予測分布の計算 -----
+
+# 予測分布のパラメータを計算
+pi_hat_star_k <- alpha_hat_k / sum(alpha_hat_k)
+pi_hat_star_k <- (colSums(s_nk) + alpha_k) / sum(colSums(s_nk) + alpha_k)
+
+# 予測分布(カテゴリ分布)のデータフレームを作成
+predict_df <- tibble(
+  k = 1:K, # 次元番号
+  prob = pi_hat_star_k # 確率
+)
+
+# 予測分布を作図
+ggplot() + 
+  geom_bar(data = predict_df, aes(x = k, y = prob), stat = "identity", position = "dodge", 
+           fill = "purple") + # 予測分布
+  geom_bar(data = model_df, aes(x = k, y = prob), stat = "identity", position = "dodge", 
+           alpha = 0, color = "red", linetype = "dashed") + # 真の分布
   labs(title = "Categorical Distribution", 
-       subtitle = paste0("N=", N, ", pi_hat=(", paste(round(pi_k_hat, 2), collapse = ", "), ")")) # ラベル
+       subtitle = paste0("N=", N, ", pi_hat=(", paste(round(pi_hat_star_k, 2), collapse = ", "), ")"))
 
 
-# 3.2.2 gif ---------------------------------------------------------------
+# ・アニメーション -----------------------------------------------------------------
 
-
-# 利用パッケージ
+# 利用するパッケージ
 library(tidyverse)
 library(gganimate)
 
 
-## パラメーターの初期値を指定
-# 観測モデルのパラメータ
-pi_k_truth <- c(0.3, 0.5, 0.2)
+### 推論処理 -----
 
-# 事前分布のパラメータ
-alpha_k <- c(2, 2, 2)
+# 次元数:(固定)
+K <- 3
 
-# 試行回数
-N <- 50
+# 真のパラメータを指定
+pi_truth_k <- c(0.3, 0.5, 0.2)
+
+# 事前分布のパラメータを指定
+alpha_k <- c(1, 1, 1)
 
 
-# 作図用のpiの値
-pi <- tibble(
-  pi_1 = rep(rep(seq(0, 1, by = 0.025), times = 41), times = 41), 
-  pi_2 = rep(rep(seq(0, 1, by = 0.025), each = 41), times = 41), 
-  pi_3 = rep(seq(0, 1, by = 0.025), each = 1681)
+# 作図用のpiの値を満遍なく生成
+point_vec <- seq(0, 1, by = 0.025) # piがとり得る値
+n_point <- length(point_vec) # 点の数
+pi_point <- tibble(
+  pi_1 = rep(rep(point_vec, times = n_point), times = n_point), 
+  pi_2 = rep(rep(point_vec, each = n_point), times = n_point), 
+  pi_3 = rep(point_vec, each = n_point^2)
 )
+pi_point <- pi_point / rowSums(pi_point) # 正規化
 
-# 正規化
-pi <- pi / apply(pi, 1, sum)
-
-# 重複した組み合わせを除去(ハイスぺ機なら不要…)
-pi <- pi %>% 
-  mutate(pi_1 = round(pi_1, 3), pi_2 = round(pi_2, 3), pi_3 = round(pi_3, 3)) %>% 
-  count(pi_1, pi_2, pi_3) %>% 
-  select(-n) %>% 
-  as.matrix()
+# 点を間引く(ハイスぺ機なら不要…)
+pi_point <- round(pi_point, 3) %>% # 値を丸め込み
+  dplyr::as_tibble() %>% # データフレームに変換
+  dplyr::distinct(pi_1, pi_2, pi_3) %>% # 重複を除去
+  as.matrix() # マトリクスに再変換
 
 
-# 事前分布を計算
+# 事前分布(ディリクレ分布)を計算
 posterior_df <- tibble(
-  x = pi[, 2] + (pi[, 3] / 2),  # 三角座標への変換
-  y = sqrt(3) * (pi[, 3] / 2),  # 三角座標への変換
-  C_D = lgamma(sum(alpha_k)) - sum(lgamma(alpha_k)),  # 正規化項(対数)
-  density = exp(C_D + apply((alpha_k - 1) * log(t(pi)), 2, sum)), # 確率密度
-  N = 0 # 試行回数
+  x = pi_point[, 2] + (pi_point[, 3] / 2), # 三角座標への変換
+  y = sqrt(3) * (pi_point[, 3] / 2), # 三角座標への変換
+  ln_C_dir = lgamma(sum(alpha_k)) - sum(lgamma(alpha_k)), # 正規化項(対数)
+  density = exp(ln_C_dir) * apply(t(pi_point)^(alpha_k - 1), 2, prod), # 確率密度
+  label = as.factor(paste0("N=", 0, ", alpha=(", paste0(alpha_k, collapse = ", "), ")")) # 試行回数とパラメータのラベル
 )
-
 
 # 初期値による予測分布のパラメーターを計算
-pi_k_hat <- alpha_k / sum(alpha_k)
+pi_star_k <- alpha_k / sum(alpha_k)
 
-# 作図用のsの値
-s_sk <- matrix(c(1, 0, 0, 0, 1, 0, 0, 0, 1), ncol = 3)
-
-# 初期値による予測分布を計算
+# 初期値による予測分布のデータフレームを作成
 predict_df <- tibble(
-  k = seq(1, 3),  # 作図用の値
-  prob = apply(pi_k_hat^s_sk, 1, prod),  # 確率
-  N = 0 # 試行回数
+  k = 1:K, # 次元番号
+  prob = pi_star_k, # 確率
+  label = as.factor(paste0("N=", 0, ", pi_star=(", paste0(pi_star_k, collapse = ", "), ")")) # 試行回数とパラメータのラベル
 )
 
 
-# パラメーターを推定
-s_nk <- matrix(0, nrow = N, ncol = 3) # 受け皿
+# データ数(試行回数)を指定
+N <- 100
+
+# パラメータを推定
+s_nk <- matrix(0, nrow = N, ncol = 3) # 受け皿を初期化
 for(n in 1:N){
   
   # カテゴリ分布に従うデータを生成
-  s_nk[n, ] <- rmultinom(n = 1, size = 1, prob = pi_k_truth) %>% 
+  s_nk[n, ] <- rmultinom(n = 1, size = 1, prob = pi_truth_k) %>% 
     as.vector()
   
-  # ハイパーパラメータを更新
+  # 事後分布のパラメータを更新
   alpha_k <- s_nk[n, ] + alpha_k
   
   # 事後分布を計算
   tmp_posterior_df <- tibble(
-    x = pi[, 2] + (pi[, 3] / 2),  # 三角座標への変換
-    y = sqrt(3) * (pi[, 3] / 2),  # 三角座標への変換
-    C_D = lgamma(sum(alpha_k)) - sum(lgamma(alpha_k)),  # 正規化項(対数)
-    density = exp(C_D + apply((alpha_k - 1) * log(t(pi)), 2, sum)), # 確率密度
-    N = n # 試行回数
+    x = pi_point[, 2] + (pi_point[, 3] / 2), # 三角座標への変換
+    y = sqrt(3) * (pi_point[, 3] / 2), # 三角座標への変換
+    ln_C_dir = lgamma(sum(alpha_k)) - sum(lgamma(alpha_k)), # 正規化項(対数)
+    density = exp(ln_C_dir) * apply(t(pi_point)^(alpha_k - 1), 2, prod), # 確率密度
+    label = as.factor(paste0("N=", n, ", alpha_hat=(", paste0(alpha_k, collapse = ", "), ")")) # 試行回数とパラメータのラベル
   )
   
+  # 予測分布のパラメーターを更新
+  pi_star_k <- alpha_k / sum(alpha_k)
   
-  # 予測分布のパラメーターを計算
-  pi_k_hat <- alpha_k / sum(alpha_k)
-  
-  # 予測分布を計算
+  # 予測分布のデータフレームを作成
   tmp_predict_df <- tibble(
-    k = seq(1, 3),  # 作図用の値
-    prob = apply(pi_k_hat^s_sk, 1, prod),  # 確率
-    N = n # 試行回数
+    k = 1:K, # 作図用の値
+    prob = pi_star_k, # 確率
+    label = as.factor(paste0(
+      "N=", n, ", pi_hat_star=(", paste0(round(pi_star_k, 2), collapse = ", "), ")"
+    )) # 試行回数とパラメータのラベル
   )
   
   # 結果を結合
@@ -212,44 +255,60 @@ for(n in 1:N){
 apply(s_nk, 2, sum)
 
 
-# piの真の値のプロット用データフレームを作成
-pi_truth_df <- tibble(
-  x = pi_k_truth[2] + (pi_k_truth[3] / 2),  # 三角座標への変換
-  y = sqrt(3) * (pi_k_truth[3] / 2),  # 三角座標への変換
-  N = seq(0, N)
+### 作図 -----
+
+# 真のパラメータのデータフレームを作成
+parameter_df <- tibble(
+  x = pi_truth_k[2] + (pi_truth_k[3] / 2), # 三角座標への変換
+  y = sqrt(3) * (pi_truth_k[3] / 2), # 三角座標への変換
 )
 
-
-## 事後分布
-# 作図
+# 事後分布を作図
 posterior_graph <- ggplot() + 
-  geom_point(data = posterior_df, aes(x, y, color = density)) + # 散布図
-  geom_point(data = pi_truth_df, aes(x, y), shape = 3, size = 5) + # piの真の値
-  scale_color_gradientn(colors = c("blue", "green", "yellow", "red")) + # プロットの色
+  geom_point(data = posterior_df, aes(x = x, y = y, color = density)) + # 事後分布
+  geom_point(data = parameter_df, aes(x = x, y = y), shape = 4, size = 5) + # 真のパラメータ
+  scale_color_gradientn(colors = c("blue", "green", "yellow", "red")) + # 散布図のグラデーション
   scale_x_continuous(breaks = c(0, 1), 
                      labels = c("(1, 0, 0)", "(0, 1, 0)")) + # x軸目盛
   scale_y_continuous(breaks = c(0, 0.87), 
                      labels = c("(1, 0, 0)", "(0, 1, 0)")) + # y軸目盛
   coord_fixed(ratio = 1) + # 縦横比
-  transition_manual(N) + # フレーム
+  gganimate::transition_manual(label) + # フレーム
   labs(title = "Dirichlet Distribution", 
-       subtitle = "N= {current_frame}", 
+       subtitle = "{current_frame}", 
        x = expression(paste(pi[1], ", ", pi[2], sep = "")), 
-       y = expression(paste(pi[1], ", ", pi[3], sep = ""))) # ラベル
+       y = expression(paste(pi[1], ", ", pi[3], sep = "")))
 
-# 描画
-animate(posterior_graph)
+# gif画像を出力
+gganimate::animate(posterior_graph, nframes = (N + 1), fps = 10)
 
 
-## 予測分布
-# 作図
-predict_graph <- ggplot(predict_df, aes(k, prob)) + 
-  geom_bar(stat = "identity", position = "dodge", fill = "#56256E") + # 棒グラフ
-  transition_manual(N) + # フレーム
+# Nフレーム分の真のモデルを格納したデータフレームを作成
+label_vec <- unique(predict_df[["label"]]) # 各試行のラベルを抽出
+model_df <- tibble()
+for(n in 1:(N + 1)) {
+  # n番目のフレーム用に作成
+  tmp_df <- tibble(
+    k = 1:K, 
+    prob = pi_truth_k, 
+    label = label_vec[n]
+  )
+  
+  # 結果を結合
+  model_df <- rbind(model_df, tmp_df)
+}
+
+# 予測分布を作図
+predict_graph <- ggplot() + 
+  geom_bar(data = predict_df, aes(x = k, y = prob), stat = "identity", position = "dodge", 
+           fill = "purple") + # 予測分布
+  geom_bar(data = model_df, aes(x = k, y = prob), stat = "identity", position = "dodge", 
+           alpha = 0, color = "red", linetype = "dashed") + # 真の分布
+  gganimate::transition_manual(label) + # フレーム
   labs(title = "Categorical Distribution", 
-       subtitle = "N= {current_frame}") # ラベル
+       subtitle = "{current_frame}")
 
-# 描画
-animate(predict_graph)
+# gif画像を出力
+gganimate::animate(predict_graph, nframes = (N + 1), fps = 10)
 
 
