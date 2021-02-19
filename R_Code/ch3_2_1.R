@@ -5,20 +5,20 @@
 library(tidyverse)
 
 
-### 真のモデルの設定 -----
+### 尤度の設定 -----
 
 # 真のパラメータを指定
 mu_truth <- 0.25
 
-# 真のモデル(ベルヌーイ分布)を計算
+# 尤度(ベルヌーイ分布)を計算
 model_df <- tibble(
-  x = c(0, 1), # xが取り得る値
+  x = c(0, 1), # xがとり得る値
   prob = c(1 - mu_truth, mu_truth) # 対応する確率
   #prob = mu_truth^x * (1 - mu_truth)^(1 - x) # 確率
   #prob = dbinom(x = x, size = 1, prob = mu_truth) # 確率
 )
 
-# 真のモデルを作図
+# 尤度を作図
 ggplot(model_df, aes(x = x, y = prob)) + 
   geom_bar(stat = "identity", position = "dodge", fill = "purple") + # 棒グラフ
   ylim(c(0, 1)) + # y軸の表示範囲
@@ -53,7 +53,7 @@ b <- 1
 
 # 事前分布(ベータ分布)を計算
 prior_df <- tibble(
-  mu = seq(0, 1, by = 0.001), # muが取り得る値
+  mu = seq(0, 1, by = 0.001), # muがとり得る値
   ln_C_beta = lgamma(a + b) - lgamma(a) - lgamma(b), # 正規化項(対数)
   density = exp(ln_C_beta) * mu^(a - 1) * (1 - mu)^(b - 1) # 確率密度
   #density = dbeta(x = mu, shape1 = a, shape2 = b) # 確率密度
@@ -62,8 +62,8 @@ prior_df <- tibble(
 # 事前分布を作図
 ggplot(prior_df, aes(x = mu, y = density)) + 
   geom_line(color = "purple") + # 折れ線グラフ
-  labs(title = "Prior Distribution", 
-       subtitle = paste0("N=", N, ", a=", a, ", b=", b), 
+  labs(title = "Beta Distribution", 
+       subtitle = paste0("a=", a, ", b=", b), 
        x = expression(mu))
 
 
@@ -91,15 +91,15 @@ ggplot(posterior_df, aes(x = mu, y = density)) +
        x = expression(mu))
 
 
-### 予測分布 -----
+### 予測分布の計算 -----
 
-# 予測分布のパラメーターを計算
+# 予測分布のパラメータを計算
 mu_hat_star <- a_hat / (a_hat + b_hat)
 #mu_hat_star <- (sum(x_n) + a) / (N + a + b)
 
 # 予測分布(ベルヌーイ分布)を計算
 predict_df <- tibble(
-  x = c(0, 1), # xが取り得る値
+  x = c(0, 1), # xがとり得る値
   prob = c(1 - mu_hat_star, mu_hat_star) # 対応する確率
   #prob = mu_hat_star^x * (1 - mu_hat_star)^(1 - x) # 確率
 )
@@ -109,13 +109,13 @@ ggplot() +
   geom_bar(data = predict_df, aes(x =x, y = prob), stat = "identity", position = "dodge", 
            fill = "purple") + # 予測分布
   geom_bar(data = model_df, aes(x = x, y = prob), stat = "identity", position = "dodge", 
-           alpha = 0, color = "red", linetype = "dashed") + # 真のモデル
+           alpha = 0, color = "red", linetype = "dashed") + # 真の分布
   ylim(c(0, 1)) + # y軸の表示範囲
-  labs(title = "Predictive Distribution", 
+  labs(title = "Beta Distribution", 
        subtitle = paste0("N=", N, ", mu_hat_star=", round(mu_hat_star, 2)))
 
 
-# アニメーション -----------------------------------------------------------------
+# ・アニメーション -----------------------------------------------------------------
 
 # 利用するパッケージ
 library(tidyverse)
@@ -133,7 +133,7 @@ b <- 1
 
 # 事前分布(ベータ分布)を計算
 posterior_df <- tibble(
-  mu = seq(0, 1, by = 0.001), # muが取り得る値
+  mu = seq(0, 1, by = 0.001), # muがとり得る値
   density = dbeta(x = mu, shape1 = a, shape2 = b), # 確率密度
   label = as.factor(paste("N=", 0, ", a=", a, ", b", b)) # 試行回数とパラメータのラベル
 )
@@ -143,7 +143,7 @@ mu_star <- a / (a + b)
 
 # 初期値による予測分布(ベルヌーイ分布)を計算
 predict_df <- tibble(
-  x = c(0, 1), # xが取り得る値
+  x = c(0, 1), # xがとり得る値
   prob = c(1 - mu_star, mu_star), # 対応する確率
   label = as.factor(paste0("N=", 0, ", mu_hat_star=", round(mu_star, 2))) # 試行回数とパラメータのラベル
 )
@@ -175,7 +175,7 @@ for(n in 1:N){
   
   # 予測分布を計算
   tmp_predict_df <- tibble(
-    x = c(0, 1),  # xが取り得る値
+    x = c(0, 1),  # xがとり得る値
     prob = c(1 - mu_star, mu_star), # 対応する確率
     label = as.factor(paste0("N=", n, ", mu_hat_star=", round(mu_star, 2))) # 試行回数とパラメータのラベル
   )
@@ -206,7 +206,7 @@ gganimate::animate(posterior_graph, nframes = (N + 1), fps = 10)
 
 
 # Nフレーム分の真のモデルを格納したデータフレームを作成
-label_vec <- unique(predict_df[["label"]])
+label_vec <- unique(predict_df[["label"]]) # 各試行のラベルを抽出
 model_df <- tibble()
 for(n in 1:(N + 1)) {
   # n番目のフレーム用に計算
