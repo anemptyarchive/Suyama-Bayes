@@ -13,7 +13,7 @@ lambda_truth <- 4
 # 作図用のxの値を設定
 x_line <- seq(0, 4 * lambda_truth)
 
-# 尤度を計算
+# 尤度を計算:式(2.37)
 model_df <- tibble(
   x = x_line, # x軸の値
   ln_C_poi = x * log(lambda_truth) - lgamma(x + 1), # 正規化項(対数)
@@ -44,7 +44,7 @@ tibble(x = x_n) %>%
   ggplot(aes(x = x)) + 
     geom_histogram(binwidth = 1) + # 観測データ
     labs(title = "Observation Data", 
-    subtitle = paste0("N=", N, ", lambda=", lambda_truth))
+         subtitle = paste0("N=", N, ", lambda=", lambda_truth))
 
 
 ### 事前分布(ガンマ分布)の設定 -----
@@ -56,7 +56,7 @@ b <- 1
 # 作図用のlambdaの値を設定
 lambda_line <- seq(0, 2 * lambda_truth, by = 0.001)
 
-# 事前分布を計算
+# 事前分布を計算:式(2.56)
 prior_df <- tibble(
   lambda = lambda_line, # x軸の値
   ln_C_gam = a * log(b) - lgamma(a), # 正規化項(対数)
@@ -74,11 +74,11 @@ ggplot(prior_df, aes(x = lambda, y = density)) +
 
 ### 事後分布(ガンマ分布)の計算 -----
 
-# 事後分布のパラメータを計算
+# 事後分布のパラメータを計算:式(3.38)
 a_hat <- sum(x_n) + a
 b_hat <- N + b
 
-# 事後分布を計算
+# 事後分布を計算:式(2.56)
 posterior_df <- tibble(
   lambda = lambda_line, # x軸の値
   ln_C_gam = a_hat * log(b_hat) - lgamma(a_hat), # 正規化項(対数)
@@ -98,13 +98,13 @@ ggplot(posterior_df, aes(x = lambda, y = density)) +
 
 ### 予測分布(負の二項分布)の計算 -----
 
-# 予測分布のパラメータを計算
+# 予測分布のパラメータを計算:式(3.44')
 r_hat <- a_hat
 p_hat <- 1 / (b_hat + 1)
 #r_hat <- sum(x_n) + a
 #p_hat <- 1 / (N + 1 + b)
 
-# 予測分布を計算
+# 予測分布を計算:式(3.43)
 predict_df <- tibble(
   x = x_line, # x軸の値
   ln_C_NB = lgamma(x + r_hat) - lgamma(x + 1) - lgamma(r_hat), # 正規化項(対数)
@@ -125,7 +125,7 @@ ggplot() +
 
 # ・アニメーション ---------------------------------------------------------------
 
-# 利用パッケージ
+# 利用するパッケージ
 library(tidyverse)
 library(gganimate)
 
@@ -166,7 +166,7 @@ predict_df <- tibble(
 # データ数(試行回数)を指定
 N <- 100
 
-# 受け皿を初期化
+# 観測データの受け皿を初期化
 x_n <- rep(0, N)
 
 # ベイズ推論
@@ -175,29 +175,29 @@ for(n in 1:N){
   # ポアソン分布に従うデータを生成
   x_n[n] <- rpois(n = 1 ,lambda = lambda_truth)
   
-  # 事後分布のパラメータを更新
+  # 事後分布のパラメータを更新:式(3.38)
   a <- sum(x_n[n] * 1) + a
   b <- 1 + b
   
-  # 事後分布(ガンマ分布)を計算
+  # 事後分布(ガンマ分布)を計算:式(2.56)
   tmp_posterior_df <- tibble(
     lambda = lambda_line, # x軸の値
     density = dgamma(x = lambda, shape = a, rate = b), # 確率密度
     label = as.factor(paste0("N=", n, ", a_hat=", a, ", b_hat=", b)) # パラメータ
   )
   
-  # 予測分布のパラメータを更新
+  # 予測分布のパラメータを更新:式(3.44)
   r <- a
   p <- 1 / (b + 1)
   
-  # 予測分布(負の二項分布)を計算
+  # 予測分布(負の二項分布)を計算:式(3.43)
   tmp_predict_df <- tibble(
     x = x_line, # x軸の値
     prob = dnbinom(x = x, size = r, prob = 1 - p), # 確率
     label = as.factor(paste0("N=", n, ", r_hat=", r, ", p_hat=", round(p, 3))) # パラメータ
   )
   
-  # 結果を結合
+  # 推論結果を結合
   posterior_df <- rbind(posterior_df, tmp_posterior_df)
   predict_df <- rbind(predict_df, tmp_predict_df)
 }
