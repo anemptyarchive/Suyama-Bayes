@@ -21,7 +21,9 @@ x_line <- seq(
 # 尤度を計算:式(2.64)
 model_df <- tibble(
   x = x_line, # x軸の値
-  density = dnorm(x = x, mean = mu_truth, sd = sqrt(1 / lambda_truth)) # 確率密度
+  C_N = 1 / sqrt(2 * pi / lambda_truth), # 正規化項
+  density = C_N * exp(- 0.5 * lambda_truth * (x - mu_truth)^2) # 確率密度
+  #density = dnorm(x = x, mean = mu_truth, sd = sqrt(1 / lambda_truth)) # 確率密度
 )
 
 # 尤度を作図
@@ -70,9 +72,9 @@ mu_line <- seq(mu_truth - 30, mu_truth + 30, by = 0.01)
 # muの事前分布を計算:式(2.64)
 prior_mu_df <- tibble(
   mu = mu_line, # x軸の値
-  density = dnorm(
-    x = mu, mean = m, sd = sqrt(1 / beta / E_lambda)
-  ) # 確率密度
+  C_N = 1 / sqrt(2 * pi / beta / E_lambda), # 正規化項
+  density = C_N * exp(- 0.5 * beta * E_lambda * (mu - m)^2) # 確率密度
+  #density = dnorm(x = mu, mean = m, sd = sqrt(1 / beta / E_lambda)) # 確率密度
 )
 
 # muの事前分布を作図
@@ -89,8 +91,8 @@ lambda_line <- seq(0, 4 * lambda_truth, by = 0.00001)
 # lambdaの事前分布を計算:式(2.56)
 prior_lambda_df <- tibble(
   lambda = lambda_line, # x軸の値
-  ln_C_gam = a * log(b) - lgamma(a), # 正規化項(対数)
-  density = exp(ln_C_gam + (a - 1) * log(lambda) - b * lambda) # 確率密度
+  ln_C_Gam = a * log(b) - lgamma(a), # 正規化項(対数)
+  density = exp(ln_C_Gam + (a - 1) * log(lambda) - b * lambda) # 確率密度
   #density = dgamma(x = lambda, shape = a, rate = b) # 確率密度
 )
 
@@ -118,14 +120,14 @@ E_lambda_hat <- a_hat / b_hat
 # muの事後分布を計算:式(2.64)
 posterior_mu_df <- tibble(
   mu = mu_line, # x軸の値
-  density = dnorm(
-    mu, mean = m_hat, sd = sqrt(1 / beta_hat / E_lambda_hat)
-  ) # 確率密度
+  C_N = 1 / sqrt(2 * pi / beta_hat / E_lambda_hat), # 正規化項
+  density = C_N * exp(- 0.5 * beta_hat * E_lambda_hat * (mu - m_hat)^2) # 確率密度
+  #density = dnorm(mu, mean = m_hat, sd = sqrt(1 / beta_hat / E_lambda_hat)) # 確率密度
 )
 
 # muの事後分布を作図
-ggplot(posterior_mu_df, aes(mu, density)) + 
-  geom_line(color = "#56256E") + # muの事後分布
+ggplot(posterior_mu_df, aes(x = mu, y = density)) + 
+  geom_line(color = "purple") + # muの事後分布
   geom_vline(aes(xintercept = mu_truth), 
              color = "red", linetype = "dashed") + # 真のmu
   labs(title = "Gaussian Distribution", 
@@ -133,11 +135,11 @@ ggplot(posterior_mu_df, aes(mu, density)) +
        x = expression(mu))
 
 
-# lambdaの事後分布を計算
+# lambdaの事後分布を計算:式(2.56)
 posterior_lambda_df <- tibble(
   lambda = lambda_line, # x軸の値
-  ln_C_gam = a_hat * log(b_hat) - lgamma(a_hat), # 正規化項(対数)
-  density = exp(ln_C_gam + (a_hat - 1) * log(lambda) - b_hat * lambda) # 確率密度
+  ln_C_Gam = a_hat * log(b_hat) - lgamma(a_hat), # 正規化項(対数)
+  density = exp(ln_C_Gam + (a_hat - 1) * log(lambda) - b_hat * lambda) # 確率密度
   #density = dgamma(x = lambda, shape = a_hat, rate = b_hat) # 確率密度
 )
 
@@ -151,7 +153,7 @@ ggplot(posterior_lambda_df, aes(x = lambda, y = density)) +
        x = expression(lambda))
 
 
-### 予測分布()の計算 -----
+### 予測分布(スチューデントのt分布)の計算 -----
 
 # 予測分布のパラメータを計算:式(3.95')
 mu_s_hat <- m_hat
@@ -179,8 +181,9 @@ ggplot() +
   geom_line(data = model_df, aes(x = x, y = density), 
             color = "red", linetype = "dashed") + # 真の分布
   labs(title = "Student's t Distribution", 
-       subtitle = paste0("N=", N, ", mu=", round(mu_s_hat, 1), 
-                         ", lambda=", round(lambda_s_hat, 3), ", nu=", nu_s_hat))
+       subtitle = paste0("N=", N, ", mu_s_hat=", round(mu_s_hat, 1), 
+                         ", lambda_s_hat=", round(lambda_s_hat, 3), 
+                         ", nu_s_hat=", nu_s_hat))
 
 
 # ・アニメーション --------------------------------------------------------------
