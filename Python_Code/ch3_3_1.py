@@ -4,7 +4,7 @@
 
 # 3.3.1項で利用するライブラリ
 import numpy as np
-from scipy.stats import norm # ガウス分布
+from scipy.stats import norm # 1次元ガウス分布
 import matplotlib.pyplot as plt
 
 #%%
@@ -14,17 +14,18 @@ import matplotlib.pyplot as plt
 # 真のパラメータを指定
 mu_truth = 25
 lmd = 0.01
+print(np.sqrt(1 / lmd)) # 標準偏差
 
 # 作図用のxの値を設定
-x_line = np.arange(
+x_line = np.linspace(
     mu_truth - 4 * np.sqrt(1 / lmd), 
     mu_truth + 4 * np.sqrt(1 / lmd), 
-    0.1
+    num=1000
 )
 
 # 尤度を計算:式(2.64)
-C_N = 1 / np.sqrt(2 * np.pi / lmd) # 正規化項
-true_model = C_N * np.exp(- 0.5 * lmd * (x_line - mu_truth)**2) # 確率密度
+ln_C_N = - 0.5 * (np.log(2 * np.pi) - np.log(lmd)) # 正規化項(対数)
+true_model = np.exp(ln_C_N - 0.5 * lmd * (x_line - mu_truth)**2) # 確率密度
 
 # 尤度を計算:SciPy ver
 #true_model = norm.pdf(x=x_line, loc=mu_truth, scale=np.sqrt(1 / lmd)) # 確率密度
@@ -32,6 +33,7 @@ true_model = C_N * np.exp(- 0.5 * lmd * (x_line - mu_truth)**2) # 確率密度
 #%%
 
 # 尤度を作図
+plt.figure(figsize=(12, 9))
 plt.plot(x_line, true_model, color='purple') # 尤度
 plt.xlabel('x')
 plt.ylabel('density')
@@ -53,12 +55,13 @@ print(x_n[:5])
 #%%
 
 # 観測データのヒストグラムを作図
+plt.figure(figsize=(12, 9))
 plt.hist(x=x_n, bins=50) # 観測データ
 plt.xlabel('x')
 plt.ylabel('count')
-plt.suptitle('Observation Data', fontsize=20)
+plt.suptitle('Gaussian Distribution', fontsize=20)
 plt.title('$N=' + str(N) + ', \mu=' + str(mu_truth) + 
-          ', \lambda=' + str(lmd) + '$', loc='left')
+          ', \sigma=' + str(np.sqrt(1 / lmd)) + '$', loc='left')
 plt.show()
 
 #%%
@@ -70,18 +73,19 @@ m = 0
 lambda_mu = 0.001
 
 # 作図用のmuの値を設定
-mu_line = np.arange(mu_truth - 30, mu_truth + 30, 0.1)
+mu_line = np.linspace(mu_truth - 50, mu_truth + 50, num=1000)
 
 # muの事前分布を計算:式(2.64)
-C_N = 1 / np.sqrt(2 * np.pi / lambda_mu) # 正規化項
-prior = C_N * np.exp(- 0.5 * lambda_mu * (mu_line - m)**2) # 確率密度
+ln_C_N = - 0.5 * (np.log(2 * np.pi) - np.log(lambda_mu)) # 正規化項(対数)
+prior = np.exp(ln_C_N - 0.5 * lambda_mu * (mu_line - m)**2) # 確率密度
 
 # muの事前分布を計算:SciPy ver
-prior = norm.pdf(x=mu_line, loc=m, scale=np.sqrt(1 / lambda_mu)) # 確率密度
+#prior = norm.pdf(x=mu_line, loc=m, scale=np.sqrt(1 / lambda_mu)) # 確率密度
 
 #%%
 
 # muの事前分布を作図
+plt.figure(figsize=(12, 9))
 plt.plot(mu_line, prior, label='prior', color='purple') # muの事前分布
 plt.xlabel('$\mu$')
 plt.ylabel('density')
@@ -92,24 +96,27 @@ plt.show()
 
 #%%
 
-### 事後分布(ガウス分布)の計算 -----
+## 事後分布(ガウス分布)の計算
 
 # muの事後分布のパラメータを計算:式(3.53),(3.54)
 lambda_mu_hat = N * lmd + lambda_mu
 m_hat = (lmd * np.sum(x_n) + lambda_mu * m) / lambda_mu_hat
+#lambda_star_hat = (N * lmd + lambda_mu) * lmd / ((N + 1) * lmd + lambda_mu)
+#mu_star_hat = (lmd * np.sum(x_n) + lambda_mu * m) / (N * lmd + lambda_mu)
 print(lambda_mu_hat)
 print(m_hat)
 
 # muの事後分布を計算:式(2.64)
-C_N = 1 / np.sqrt(2 * np.pi / lambda_mu_hat) # 正規化項
-posterior = C_N * np.exp(- 0.5 * lambda_mu_hat * (mu_line - m_hat)**2) # 確率密度
+ln_C_N = - 0.5 * (np.log(2 * np.pi) - np.log(lambda_mu_hat)) # 正規化項(対数)
+posterior = np.exp(ln_C_N - 0.5 * lambda_mu_hat * (mu_line - m_hat)**2) # 確率密度
 
 # muの事前分布を計算:SciPy ver
 prior = norm.pdf(x=mu_line, loc=m_hat, scale=np.sqrt(1 / lambda_mu_hat)) # 確率密度
 
 #%%
 
-# muの事前分布を作図
+# muの事後分布を作図
+plt.figure(figsize=(12, 9))
 plt.plot(mu_line, posterior, label='posterior', color='purple') # muの事後分布
 plt.vlines(x=mu_truth, ymin=0, ymax=max(posterior), 
            label='$\mu_{truth}$', color='red', linestyle='--') # 真のmu
@@ -117,7 +124,7 @@ plt.xlabel('$\mu$')
 plt.ylabel('density')
 plt.suptitle('Gaussian Distribution', fontsize=20)
 plt.title('$\hat{m}=' + str(np.round(m_hat, 1)) + 
-          ', \hat{\lambda}_{\mu}=' + str(np.round(lambda_mu_hat, 2)) + '$', loc='left')
+          ', \hat{\lambda}_{\mu}=' + str(np.round(lambda_mu_hat, 3)) + '$', loc='left')
 plt.legend()
 plt.show()
 
@@ -133,8 +140,8 @@ print(lambda_star_hat)
 print(mu_star_hat)
 
 # 予測分布を計算:式(2.64)
-C_N = 1 / np.sqrt(2 * np.pi / lambda_star_hat) # 正規化項
-predict = C_N * np.exp(- 0.5 * lambda_star_hat * (x_line - mu_star_hat)**2) # 確率密度
+ln_C_N = - 0.5 * (np.log(2 * np.pi) - np.log(lambda_star_hat)) # 正規化項(対数)
+predict = np.exp(ln_C_N - 0.5 * lambda_star_hat * (x_line - mu_star_hat)**2) # 確率密度
 
 # 予測分布を計算:SciPy ver
 #predict = norm.pdf(x=x_line, loc=mu_star_hat, scale=np.sqrt(1 / lambda_star_hat)) # 確率密度
@@ -142,6 +149,7 @@ predict = C_N * np.exp(- 0.5 * lambda_star_hat * (x_line - mu_star_hat)**2) # �
 #%%
 
 # 予測分布を作図
+plt.figure(figsize=(12, 9))
 plt.plot(x_line, predict, label='predict', color='purple') # 予測分布
 plt.plot(x_line, true_model, label='true', color='red', linestyle='--') # 真の分布
 plt.xlabel('x')
@@ -158,7 +166,7 @@ plt.show()
 
 # 利用するライブラリ
 import numpy as np
-from scipy.stats import norm # ガウス分布
+from scipy.stats import norm # 1次元ガウス分布
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
@@ -178,16 +186,18 @@ lambda_mu = 0.001
 mu_star = m
 lambda_star = lmd * lambda_mu / (lmd + lambda_mu)
 
-# データ数(試行回数)を指定
-N = 100
-
-# 作図用の値を設定
-x_line = np.arange(
+# 作図用のxの値を設定
+x_line = np.linspace(
     mu_truth - 4 * np.sqrt(1 / lmd), 
     mu_truth + 4 * np.sqrt(1 / lmd), 
-    0.1
+    num=1000
 )
-mu_line = np.arange(mu_truth - 30, mu_truth + 30, 0.1)
+
+# 作図用のmuの値を設定
+mu_line = np.linspace(mu_truth - 50, mu_truth + 50, num=1000)
+
+# データ数(試行回数)を指定
+N = 100
 
 # 推移の記録用の受け皿を初期化
 x_n = np.empty(N)
@@ -208,7 +218,7 @@ for n in range(N):
     lambda_mu += lmd
     m = (lmd * x_n[n] + lambda_mu_old * m) / lambda_mu
     
-    # muの事後分布を計算:式(2.64)
+    # muの事後分布(ガウス分布)を計算:式(2.64)
     trace_posterior.append(
         norm.pdf(x=mu_line, loc=m, scale=np.sqrt(1 / lambda_mu))
     )
@@ -217,7 +227,7 @@ for n in range(N):
     mu_star = m
     lambda_star = lmd * lambda_mu / (lmd + lambda_mu)
     
-    # 予測分布を計算:siki(2.64)
+    # 予測分布(ガウス分布)を計算:siki(2.64)
     trace_predict.append(
         norm.pdf(x=x_line, loc=mu_star, scale=np.sqrt(1 / lambda_star))
     )
@@ -248,7 +258,7 @@ def update_posterior(n):
     plt.ylabel('density')
     plt.suptitle('Gaussian Distribution', fontsize=20)
     plt.title('$N=' + str(n) + ', \hat{m}=' + str(np.round(trace_m[n], 1)) + 
-              ', \hat{\lambda}_{\mu}=' + str(np.round(trace_lambda_mu[n], 2)) + '$', loc='left')
+              ', \hat{\lambda}_{\mu}=' + str(np.round(trace_lambda_mu[n], 3)) + '$', loc='left')
     plt.legend()
 
 # gif画像を作成
