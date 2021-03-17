@@ -10,19 +10,22 @@ library(tidyverse)
 # 真のパラメータを指定
 mu <- 25
 lambda_truth <- 0.01
+print(sqrt(1 / lambda_truth)) # 標準偏差
 
 # 作図用のxの値を設定
 x_line <- seq(
   mu - 4 * sqrt(1 / lambda_truth), 
   mu + 4 * sqrt(1 / lambda_truth), 
-  by = 0.1
+  length.out = 1000
 )
 
 # 尤度を計算:式(2.64)
 model_df <- tibble(
   x = x_line, # x軸の値
-  C_N = 1 / sqrt(2 * pi / lambda_truth), # 正規化項
-  density = C_N * exp(- 0.5 * lambda_truth * (x - mu)^2) # 確率密度
+  ln_C_N = - 0.5 * (log(2 * pi) - log(lambda_truth)), # 正規化項(対数)
+  density = exp(ln_C_N - 0.5 * lambda_truth * (x - mu)^2) # 確率密度
+  #C_N = 1 / sqrt(2 * pi / lambda_truth), # 正規化項
+  #density = C_N * exp(- 0.5 * lambda_truth * (x - mu)^2) # 確率密度
   #density = dnorm(x, mean = mu, sd = sqrt(1 / lambda_truth)) # 確率密度
 )
 
@@ -30,7 +33,7 @@ model_df <- tibble(
 ggplot(model_df, aes(x = x, y = density)) + 
   geom_line(color = "purple") + # 尤度
   labs(title = "Gaussian Distribution", 
-       subtitle = paste0("mu=", round(mu, 2), ", sigma=", round(sqrt(1 / lambda_truth), 1)))
+       subtitle = paste0("mu=", round(mu, 2), ", lambda=",lambda_truth))
 
 
 ### 観測データの生成 -----
@@ -48,7 +51,7 @@ summary(x_n)
 tibble(x = x_n) %>% 
   ggplot(aes(x = x)) + 
   geom_histogram(binwidth = 1) + # 観測データ
-  labs(title = "Observation Data", 
+  labs(title = "Gaussian Distribution", 
        subtitle = paste0("N=", N, ", mu=", mu, ", sigma=", round(sqrt(1 / lambda_truth), 1)))
 
 
@@ -59,13 +62,13 @@ a <- 1
 b <- 1
 
 # 作図用のlambdaの値を設定
-lambda_line <- seq(0, 4 * lambda_truth, by = 0.00001)
+lambda_line <- seq(0, 4 * lambda_truth, length.out = 1000)
 
 # lambdaの事前分布を計算:式(2.56)
 prior_df <- tibble(
   lambda = lambda_line, # x軸の値
   ln_C_Gam = a * log(b) - lgamma(a), # 正規化項(対数)
-  density = exp(ln_C_Gam + (a - 1) * log(lambda) - b * lambda), # 確率密度
+  density = exp(ln_C_Gam + (a - 1) * log(lambda) - b * lambda) # 確率密度
   #density = dgamma(x = lambda, shape = a, rate = b) # 確率密度
 )
 
@@ -103,7 +106,7 @@ ggplot(posterior_df, aes(x = lambda, y = density)) +
 ### 予測分布(スチューデントのt分布)の計算 -----
 
 # 予測分布のパラメータを計算:式(3.79)
-mu_s_hat <- mu
+mu_s <- mu
 lambda_s_hat <- a_hat / b_hat
 nu_s_hat <- 2 * a_hat
 #lambda_s_hat <- (N + 2 * a) / (sum((x_n - mu)^2) + 2 * b)
@@ -114,7 +117,7 @@ predict_df <- tibble(
   x = x_line, # x軸の値
   ln_C_St = lgamma(0.5 * (nu_s_hat + 1)) - lgamma(0.5 * nu_s_hat), # 正規化項(対数)
   ln_term1 = 0.5 * log(lambda_s_hat / pi / nu_s_hat), 
-  ln_term2 = - 0.5 * (nu_s_hat + 1) * log(1 + lambda_s_hat / nu_s_hat * (x - mu_s_hat)^2), 
+  ln_term2 = - 0.5 * (nu_s_hat + 1) * log(1 + lambda_s_hat / nu_s_hat * (x - mu_s)^2), 
   density = exp(ln_C_St + ln_term1 + ln_term2) # 確率密度
 )
 
@@ -125,31 +128,30 @@ ggplot() +
   geom_line(data = model_df, aes(x = x, y = density), 
             color = "red", linetype = "dashed") + # 真の分布
   labs(title = "Student's t Distribution", 
-       subtitle = paste0("N=", N, ", mu_s_hat=", mu_s, 
+       subtitle = paste0("N=", N, ", mu_s=", mu_s, 
                          ", lambda_s_hat=", round(lambda_s_hat, 3), 
                          ", nu_s_hat=", nu_s_hat))
 
 
 # try ---------------------------------------------------------------
 
-predict_df <- tibble(
+# 予測分布を作図
+tibble(
   x = x_line, # x軸の値
   t = x - mu_s, # 中心をズラす
-  density = dt(t, df = nu_s_hat, ncp = lambda_s_hat) # 確率密度
-)
-
-# 予測分布を作図
-ggplot() + 
-  geom_line(data = predict_df, aes(x = t, y = density), 
-            color = "purple") + # 予測分布
+  density = dt(t, df = nu_s_hat) # 確率密度
+) %>% 
+  ggplot(data = ., aes(x = t, y = density)) + 
+  geom_line(color = "purple") + # 予測分布
   geom_line(data = model_df, aes(x = x, y = density), 
             color = "red", linetype = "dashed") + # 真の分布
   labs(title = "Student's t Distribution", 
-       subtitle = paste0("N=", N, ", mu_s_hat=", mu_s, 
+       subtitle = paste0("N=", N, ", mu_s=", mu_s, 
                          ", lambda_s_hat=", round(lambda_s_hat, 3), 
                          ", nu_s_hat=", nu_s_hat))
 
 warnings()
+
 # ・アニメーション ---------------------------------------------------------------
 
 # 利用するパッケージ
@@ -169,9 +171,9 @@ b <- 1
 
 
 # 作図用のlambdaの値を設定
-lambda_line <- seq(0, 4 * lambda_truth, by = 0.00001)
+lambda_line <- seq(0, 4 * lambda_truth, length.out = 1000)
 
-# lambdaの事前分布を計算:式(2.56)
+# lambdaの事前分布(ガンマ分布)を計算:式(2.56)
 posterior_df <- tibble(
   lambda = lambda_line, # x軸の値
   density = dgamma(x = lambda, shape = a, rate = b), # 確率密度
@@ -188,10 +190,10 @@ nu_s <- 2 * a
 x_line <- seq(
   mu - 4 * sqrt(1 / lambda_truth), 
   mu + 4 * sqrt(1 / lambda_truth), 
-  by = 0.1
+  length.out = 1000
 )
 
-# 初期値による予測分布を計算:式(3.76)
+# 初期値による予測分布(スチューデントのt分布)を計算:式(3.76)
 predict_df <- tibble(
   x = x_line, # x軸の値
   ln_C_St = lgamma(0.5 * (nu_s + 1)) - lgamma(0.5 * nu_s), # 正規化項(対数)
@@ -220,7 +222,7 @@ for(n in 1:N){
   a <- 1 / 2 + a
   b <- 0.5 * (x_n[n] - mu)^2 + b
   
-  # lambdaの事後分布を計算:式(2.56)
+  # lambdaの事後分布(ガンマ分布)を計算:式(2.56)
   tmp_posterior_df <- tibble(
     lambda = lambda_line, # x軸の値
     density = dgamma(x = lambda, shape = a, rate = b), # 確率密度
@@ -232,7 +234,7 @@ for(n in 1:N){
   lambda_s <- a / b
   nu_s <- 2 * a
   
-  # 予測分布を計算:式(3.76)
+  # 予測分布(スチューデントのt分布)を計算:式(3.76)
   tmp_predict_df <- tibble(
     x = x_line, # x軸の値
     ln_C_St = lgamma(0.5 * (nu_s + 1)) - lgamma(0.5 * nu_s), # 正規化項(対数)
@@ -240,7 +242,7 @@ for(n in 1:N){
     ln_term2 = - 0.5 * (nu_s + 1) * log(1 + lambda_s / nu_s * (x - mu_s)^2), 
     density = exp(ln_C_St + ln_term1 + ln_term2), # 確率密度
     label = as.factor(
-      paste0("N=", n, ", mu_s_hat=", mu_s, ", lambda_s_hat=", round(lambda_s, 3), ", nu_s_hat=", nu_s)
+      paste0("N=", n, ", mu_s=", mu_s, ", lambda_s_hat=", round(lambda_s, 3), ", nu_s_hat=", nu_s)
     ) # パラメータ
   )
   
@@ -260,13 +262,13 @@ posterior_graph <- ggplot(posterior_df, aes(x = lambda, y = density)) +
   geom_line(color = "purple") + # lambdaの事後分布
   geom_vline(aes(xintercept = lambda_truth), 
              color = "red", linetype = "dashed") + # 真のlambda
-  transition_manual(label) + # フレーム
+  gganimate::transition_manual(label) + # フレーム
   labs(title = "Gamma Distribution", 
        subtitle = "{current_frame}", 
        x = expression(lambda))
 
 # gif画像を出力
-animate(posterior_graph, nframes = N + 1, fps = 10)
+gganimate::animate(posterior_graph, nframes = N + 1, fps = 10)
 
 
 # 尤度を計算:式(2.64)
@@ -281,11 +283,11 @@ predict_graph <- ggplot() +
             color = "purple") + # 予測分布
   geom_line(data = model_df, aes(x = x, y = density), 
             color = "red", linetype = "dashed") + # 真の分布
-  transition_manual(label) + # フレーム
+  gganimate::transition_manual(label) + # フレーム
   labs(title = "Student's t Distribution", 
        subtitle = "{current_frame}")
 
 # gif画像を出力
-animate(predict_graph, nframes = N + 1, fps = 10)
+gganimate::animate(predict_graph, nframes = N + 1, fps = 10)
 
 
