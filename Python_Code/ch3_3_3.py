@@ -1,11 +1,11 @@
-# 3.3.3 1次元ガウス分布の学習と予測：平均と精度が未知の場合
+# 3.3.3 1次元ガウス分布の学習と予測：平均・精度が未知の場合
 
 #%%
 
 # 3.3.3項で利用するライブラリ
 import numpy as np
 import math # 対数ガンマ関数:lgamma()
-from scipy.stats import norm, gamma, t # ガウス分布, ガンマ分布, スチューデントのt分布
+from scipy.stats import norm, gamma, t # 1次元ガウス分布, ガンマ分布, 1次元スチューデントのt分布
 import matplotlib.pyplot as plt
 
 #%%
@@ -18,28 +18,28 @@ lambda_truth = 0.01
 print(np.sqrt(1 / lambda_truth)) # 標準偏差
 
 # 作図用のxの値を設定
-x_line = np.arange(
+x_line = np.linspace(
     mu_truth - 4 * np.sqrt(1 / lambda_truth), 
     mu_truth + 4 * np.sqrt(1 / lambda_truth), 
-    0.1
+    num=1000
 )
 
 # 尤度を計算:式(2.64)
-C_N = 1 / np.sqrt(2 * np.pi / lambda_truth) # 正規化項
-true_model = C_N * np.exp(- 0.5 * lambda_truth * (x_line - mu_truth)**2) # 確率密度
+ln_C_N = - 0.5 *(np.log(2 * np.pi) - np.log(lambda_truth)) # 正規化項(対数)
+true_model = np.exp(ln_C_N - 0.5 * lambda_truth * (x_line - mu_truth)**2) # 確率密度
 
 # 尤度を計算:SciPy ver
-true_model = norm.pdf(x=x_line, loc=mu_truth, scale=np.sqrt(1 / lambda_truth)) # 確率密度
+#true_model = norm.pdf(x=x_line, loc=mu_truth, scale=np.sqrt(1 / lambda_truth)) # 確率密度
 
 #%%
 
 # 尤度を作図
-plt.plot(x_line, true_model, label='true model', color='purple') # 尤度
+plt.figure(figsize=(12, 9))
+plt.plot(x_line, true_model, color='purple') # 尤度
 plt.xlabel('x')
 plt.ylabel('density')
 plt.suptitle('Gaussian Distribution', fontsize=20)
 plt.title('$\mu=' + str(mu_truth) + ', \lambda=' + str(lambda_truth) + '$', loc='left')
-plt.legend()
 plt.show()
 
 #%%
@@ -56,10 +56,11 @@ print(x_n[:5])
 #%%
 
 # 観測データのヒストグラムを作図
+plt.figure(figsize=(12, 9))
 plt.hist(x=x_n, bins=50) # 観測データ
 plt.xlabel('x')
 plt.ylabel('count')
-plt.suptitle('Observation Data', fontsize=20)
+plt.suptitle('Gaussian Distribution', fontsize=20)
 plt.title('$N=' + str(N) + ', \mu=' + str(mu_truth) + 
           ', \lambda=' + str(lambda_truth) + '$', loc='left')
 plt.show()
@@ -81,18 +82,31 @@ E_lambda = a / b
 
 
 # 作図用のmuの値を設定
-mu_line = np.arange(mu_truth - 30, mu_truth + 30, 0.1)
+mu_line = np.linspace(mu_truth - 30, mu_truth + 30, num=1000)
 
 # muの事前分布を計算:式(2.64)
-C_N = 1 / np.sqrt(2 * np.pi / beta / E_lambda) # 正規化項
-prior_mu = C_N * np.exp(- 0.5 * beta * E_lambda * (mu_line - m)**2) # 確率密度
+ln_C_N = - 0.5 * (np.log(2 * np.pi) - np.log(beta * E_lambda)) # 正規化項(対数)
+prior_mu = np.exp(ln_C_N - 0.5 * beta * E_lambda * (mu_line - m)**2) # 確率密度
 
 # muの事前分布を計算:SciPy ver
 #prior_mu = norm.pdf(x=mu_line, loc=m, scale=np.sqrt(1 / beta / E_lambda)) # 確率密度
 
+#%%
+
+# muの事前分布を作図
+plt.figure(figsize=(12, 9))
+plt.plot(mu_line, prior_mu, label='$\mu$ prior', color='purple') # muの事前分布
+plt.xlabel('$\mu$')
+plt.ylabel('density')
+plt.suptitle('Gaussian Distribution', fontsize=20)
+plt.title('$m=' + str(m) + ', \\beta=' + str(beta) + 
+          ', E[\lambda]=' + str(np.round(E_lambda, 3)) + '$', loc='left')
+plt.show()
+
+#%%
 
 # 作図用のlambdaの値を設定
-lambda_line = np.arange(0, 4 * lambda_truth, 0.00001)
+lambda_line = np.linspace(0, 4 * lambda_truth, num=1000)
 
 # lambdaの事前分布を計算:式(2.56)
 ln_C_Gam = a * np.log(b) - math.lgamma(a) # 正規化項(対数)
@@ -103,24 +117,13 @@ prior_lambda = np.exp(ln_C_Gam + (a - 1) * np.log(lambda_line) - b * lambda_line
 
 #%%
 
-# muの事前分布を作図
-plt.plot(mu_line, prior_mu, label='$\mu$ prior', color='purple') # muの事前分布
-plt.xlabel('$\mu$')
-plt.ylabel('density')
-plt.suptitle('Gaussian Distribution', fontsize=20)
-plt.title('$m=' + str(m) + ', \\beta=' + str(beta) + '$', loc='left')
-plt.legend()
-plt.show()
-
-#%%
-
 # lambdaの事前分布を作図
+plt.figure(figsize=(12, 9))
 plt.plot(lambda_line, prior_lambda, label='$\lambda$ prior', color='purple') # lambdaの事前分布
 plt.xlabel('$\lambda$')
 plt.ylabel('density')
 plt.suptitle('Gamma Distribution', fontsize=20)
 plt.title('$a=' + str(a) + ', b=' + str(b) + '$', loc='left')
-plt.legend()
 plt.show()
 
 #%%
@@ -144,11 +147,29 @@ E_lambda_hat = a_hat / b_hat
 print(E_lambda_hat)
 
 # muの事後分布を計算:式(2.64)
-C_N = 1 / np.sqrt(2 * np.pi / beta_hat / E_lambda_hat) # 正規化項
-posterior_mu = C_N * np.exp(- 0.5 * beta_hat * E_lambda_hat * (mu_line - m_hat)**2) # 確率密度
+ln_C_N = - 0.5 * (np.log(2 * np.pi) - np.log(beta_hat * E_lambda_hat)) # 正規化項(対数)
+posterior_mu = np.exp(ln_C_N - 0.5 * beta_hat * E_lambda_hat * (mu_line - m_hat)**2) # 確率密度
 
 # muの事前分布を計算:SciPy ver
 #posterior_mu = norm.pdf(x=mu_line, loc=m_hat, scale=np.sqrt(1 / beta_hat / E_lambda_hat)) # 確率密度
+
+#%%
+
+# muの事後分布を作図
+plt.figure(figsize=(12, 9))
+plt.plot(mu_line, posterior_mu, label='$\mu$ posterior', color='purple') # muの事後分布
+plt.vlines(x=mu_truth, ymin=0, ymax=max(posterior_mu), 
+           label='$\mu$ truth', color='red', linestyle='--') # 真のmu
+plt.xlabel('$\mu$')
+plt.ylabel('density')
+plt.suptitle('Gaussian Distribution', fontsize=20)
+plt.title('$N=' + str(N) + ', \hat{m}=' + str(np.round(m_hat, 1)) + 
+          ', \hat{\\beta}=' + str(beta_hat) + 
+          ', E[\hat{\lambda}]=' + str(np.round(E_lambda_hat, 3)) + '$', loc='left')
+plt.legend()
+plt.show()
+
+#%%
 
 # lambdaの事後分布の計算:式(2.56)
 ln_C_Gam = a_hat * np.log(b_hat) - math.lgamma(a_hat) # 正規化項(対数)
@@ -159,21 +180,8 @@ posterior_lambda = np.exp(ln_C_Gam + (a_hat - 1) * np.log(lambda_line) - b_hat *
 
 #%%
 
-# muの事前分布を作図
-plt.plot(mu_line, posterior_mu, label='$\mu$ posterior', color='purple') # muの事後分布
-plt.vlines(x=mu_truth, ymin=0, ymax=max(posterior_mu), 
-           label='$\mu$ truth', color='red', linestyle='--') # 真のmu
-plt.xlabel('$\mu$')
-plt.ylabel('density')
-plt.suptitle('Gaussian Distribution', fontsize=20)
-plt.title('$\hat{m}=' + str(np.round(m_hat, 1)) + 
-          ', \hat{\\beta}=' + str(beta_hat) + '$', loc='left')
-plt.legend()
-plt.show()
-
-#%%
-
 # lambdaの事後分布を作図
+plt.figure(figsize=(12, 9))
 plt.plot(lambda_line, posterior_lambda, label='$\lambda$ posterior', color='purple') # lambdaの事後分布
 plt.vlines(x=lambda_truth, ymin=0, ymax=max(posterior_lambda), label='$\lambda$ truth', 
            color='red', linestyle='--') # 真のlambda
@@ -192,6 +200,14 @@ plt.show()
 mu_s_hat = m_hat
 lambda_s_hat = beta_hat * a_hat / (1 + beta_hat) / b_hat
 nu_s_hat = 2 * a_hat
+mu_s_hat = (np.sum(x_n) + beta_hat * m) / (N + beta)
+#numer_lambda = (N + beta) * (0.5 * N + a)
+#denom_lambda = (N + 1 + beta) * (0.5 * (np.sum(x_n**2) + beta + m**2 - beta_hat * m_hat**2) + beta)
+#lambda_s_hat = numer_lambda / denom_lambda
+#nu_s_hat = N + 2 * a
+print(mu_s_hat)
+print(lambda_s_hat)
+print(lambda_s_hat)
 
 # 予測分布を計算:式(3.76)
 ln_C_St = math.lgamma(0.5 * (nu_s_hat + 1)) - math.lgamma(0.5 * nu_s_hat) # 正規化項(対数)
@@ -205,6 +221,7 @@ predict = t.pdf(x=x_line, df=nu_s_hat, loc=mu_s_hat, scale=np.sqrt(1 / lambda_s_
 #%%
 
 # 予測分布を作図
+plt.figure(figsize=(12, 9))
 plt.plot(x_line, predict, label='predict', color='purple') # 予測分布
 plt.plot(x_line, true_model, label='true', color='red', linestyle='--') # 真の分布
 plt.xlabel('x')
@@ -222,7 +239,7 @@ plt.show()
 
 # 利用するライブラリ
 import numpy as np
-from scipy.stats import norm, gamma, t # ガウス分布, ガンマ分布, スチューデントのt分布
+from scipy.stats import norm, gamma, t # 1次元ガウス分布, ガンマ分布, 1次元スチューデントのt分布
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
@@ -250,17 +267,21 @@ mu_s = m
 lambda_s = beta * a / (1 + beta) / b
 nu_s = 2 * a
 
-# データ数(試行回数)を指定
-N = 100
-
-# 作図用の値を設定
-x_line = np.arange(
+# 作図用のxの値を設定
+x_line = np.linspace(
     mu_truth - 4 * np.sqrt(1 / lambda_truth), 
     mu_truth + 4 * np.sqrt(1 / lambda_truth), 
-    0.1
+    num=1000
 )
-mu_line = np.arange(mu_truth - 30, mu_truth + 30, 0.1)
-lambda_line = np.arange(0, 4 * lambda_truth, 0.00001)
+
+# 作図用のmuの値を設定
+mu_line = np.linspace(mu_truth - 50, mu_truth + 50, num=1000)
+
+# 作図用のlambdaの値を設定
+lambda_line = np.linspace(0, 4 * lambda_truth, num=1000)
+
+# データ数(試行回数)を指定
+N = 100
 
 # 推移の記録用の受け皿を初期化
 x_n = np.empty(N)
