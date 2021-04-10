@@ -14,8 +14,8 @@ sigma_truth_dd <- matrix(c(20, 15, 15, 30), nrow = 2, ncol = 2)
 lambda_truth_dd <- solve(sigma_truth_dd^2)
 
 # 作図用のxの点を作成
-x_1_vec <- seq(mu_d[1] - 4 * sigma_truth_dd[1, 1], mu_d[1] + 4 * sigma_truth_dd[1, 1], by = 0.25)
-x_2_vec <- seq(mu_d[2] - 4 * sigma_truth_dd[2, 2], mu_d[2] + 4 * sigma_truth_dd[2, 2], by = 0.25)
+x_1_vec <- seq(mu_d[1] - 4 * sigma_truth_dd[1, 1], mu_d[1] + 4 * sigma_truth_dd[1, 1], length.out = 1000)
+x_2_vec <- seq(mu_d[2] - 4 * sigma_truth_dd[2, 2], mu_d[2] + 4 * sigma_truth_dd[2, 2], length.out = 1000)
 x_point_mat <- cbind(
   rep(x_1_vec, times = length(x_2_vec)), 
   rep(x_2_vec, each = length(x_1_vec))
@@ -43,7 +43,7 @@ ggplot(model_df, aes(x = x_1, y = x_2, z = density, color = ..level..)) +
 ### 観測データの生成 -----
 
 # (観測)データ数を指定
-N <- 100
+N <- 50
 
 # 多次元ガウス分布に従うデータを生成
 x_nd <- mvnfast::rmvn(n = N, mu = mu_d, sigma = solve(lambda_truth_dd))
@@ -72,7 +72,7 @@ ggplot() +
 ### 事前分布(ウィシャート分布)の設定 -----
 
 # lambdaの事前分布のパラメータを指定
-w_dd <- matrix(c(0.00005, 0, 0, 0.00005), nrow = 2, ncol = 2)
+w_dd <- matrix(c(0.0005, 0, 0, 0.0005), nrow = 2, ncol = 2)
 nu <- 2
 
 # lambdaの期待値を計算:式(2.89)
@@ -133,8 +133,8 @@ ggplot() +
 
 ### 予測分布(多次元スチューデントのt分布)の計算 -----
 
-# 次元数:(固定)
-D <- 2
+# 次元数を取得
+D <- length(mu_d)
 
 # 予測分布のパラメータを計算:式(3.124)
 mu_s_d <- mu_d
@@ -155,6 +155,7 @@ ggplot() +
   geom_contour(data = predict_df, aes(x = x_1, y = x_2, z = density, color = ..level..)) + # 予測分布
   geom_contour(data = model_df, aes(x = x_1, y = x_2, z = density, color = ..level..), 
                alpha = 0.5, linetype = "dashed") + # 尤度
+  geom_point(data = x_df, aes(x = x_n1, y = x_n2)) + # 観測データ
   labs(title = "Multivariate Student's t Distribution", 
        subtitle = paste0("N=", N, ", nu_s_hat=", nu_s_hat, 
                          ", lambda_s_hat=(", paste(round(lambda_s_hat_dd, 5), collapse = ", "), ")"), 
@@ -179,7 +180,7 @@ lambda_truth_dd <- solve(sigma_truth_dd^2)
 
 # 事前分布のパラメータを指定
 nu <- 2
-w_dd <- matrix(c(0.00005, 0, 0, 0.00005), nrow = 2, ncol = 2)
+w_dd <- matrix(c(0.0005, 0, 0, 0.0005), nrow = 2, ncol = 2)
 
 # 初期値によるlambdaの期待値を計算:式(2.89)
 E_lambda_dd <- nu * w_dd
@@ -191,8 +192,8 @@ nu_s <- nu - 1
 
 
 # 作図用のxの点を作成
-x_1_vec <- seq(mu_d[1] - 4 * sigma_truth_dd[1, 1], mu_d[1] + 4 * sigma_truth_dd[1, 1], by = 0.25)
-x_2_vec <- seq(mu_d[2] - 4 * sigma_truth_dd[2, 2], mu_d[2] + 4 * sigma_truth_dd[2, 2], by = 0.25)
+x_1_vec <- seq(mu_d[1] - 4 * sigma_truth_dd[1, 1], mu_d[1] + 4 * sigma_truth_dd[1, 1], length.out = 500)
+x_2_vec <- seq(mu_d[2] - 4 * sigma_truth_dd[2, 2], mu_d[2] + 4 * sigma_truth_dd[2, 2], length.out = 500)
 x_point_mat <- cbind(
   rep(x_1_vec, times = length(x_2_vec)), 
   rep(x_2_vec, each = length(x_1_vec))
@@ -230,7 +231,7 @@ predict_df <- tibble(
 
 
 # データ数(試行回数)を指定
-N <- 50
+N <- 100
 
 # 観測データの受け皿を初期化
 x_nd <- matrix(0, nrow = N, ncol = 2)

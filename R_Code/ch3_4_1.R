@@ -163,7 +163,7 @@ ggplot() +
   geom_point(data = x_df, aes(x = x_n1, y = x_n2)) + # 観測データ
   labs(title = "Multivariate Gaussian Distribution", 
        subtitle = paste0("N=", N, ", mu_star_hat=(", paste(round(mu_star_hat_d, 1), collapse = ", "), ")", 
-                         ", sigma_star_hat=(", paste(round(sqrt(solve(lambda_star_hat_dd)), 1), collapse = ", "), ")"), 
+                         ", lambda_star_hat=(", paste(round(lambda_star_hat_dd, 5), collapse = ", "), ")"), 
        x = expression(x[1]), y = expression(x[2]), 
        color = "density")
 
@@ -194,8 +194,8 @@ mu_star_d <- m_d
 
 
 # 作図用のmuの点を作成
-mu_1_vec <- seq(mu_truth_d[1] - 100, mu_truth_d[1] + 100, length.out = 1000)
-mu_2_vec <- seq(mu_truth_d[2] - 100, mu_truth_d[2] + 100, length.out = 1000)
+mu_1_vec <- seq(mu_truth_d[1] - 100, mu_truth_d[1] + 100, length.out = 500)
+mu_2_vec <- seq(mu_truth_d[2] - 100, mu_truth_d[2] + 100, length.out = 500)
 mu_point_mat <- cbind(
   rep(mu_1_vec, times = length(mu_2_vec)), 
   rep(mu_2_vec, each = length(mu_1_vec))
@@ -219,8 +219,8 @@ posterior_df <- tibble(
 
 
 # 作図用のxの点を作成
-x_1_vec <- seq(mu_truth_d[1] - 4 * sigma_dd[1, 1], mu_truth_d[1] + 4 * sigma_dd[1, 1], length.out = 1000)
-x_2_vec <- seq(mu_truth_d[2] - 4 * sigma_dd[2, 2], mu_truth_d[2] + 4 * sigma_dd[2, 2], length.out = 1000)
+x_1_vec <- seq(mu_truth_d[1] - 4 * sigma_dd[1, 1], mu_truth_d[1] + 4 * sigma_dd[1, 1], length.out = 500)
+x_2_vec <- seq(mu_truth_d[2] - 4 * sigma_dd[2, 2], mu_truth_d[2] + 4 * sigma_dd[2, 2], length.out = 500)
 x_point_mat <- cbind(
   rep(x_1_vec, times = length(x_2_vec)), 
   rep(x_2_vec, each = length(x_1_vec))
@@ -359,9 +359,10 @@ for(n in 1:N) {
 # 予測分布を作図
 predict_graph <- ggplot() + 
   geom_contour(data = predict_df, aes(x = x_1, y = x_2, z = density, color = ..level..)) + # 予測分布
+  geom_point(data = x_df, aes(x = x_n1, y = x_n2)) + # 観測データ
   geom_contour(data = model_df, aes(x = x_1, y = x_2, z = density, color = ..level..), 
                alpha = 0.5, linetype = "dashed") + # 真の分布
-  geom_point(data = x_df, aes(x = x_n1, y = x_n2)) + # 観測データ
+  geom_point(data = mu_df, aes(x = mu_1, y = mu_2), color = "red", shape = 4, size = 5) + # 真のmu
   gganimate::transition_manual(label) + # フレーム
   labs(title = "Multivariate Gaussian Distribution", 
        subtitle = "{current_frame}", 
