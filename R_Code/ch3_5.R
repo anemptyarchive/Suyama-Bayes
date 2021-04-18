@@ -8,7 +8,7 @@ library(mvtnorm)
 
 ### モデルの構築 -----
 
-# ベクトル(1, x^1, ..., x^(m-1))の作成関数を定義
+# {x^(m-1)}ベクトル作成関数を定義
 x_vector <- function(x_n, M) {
   # 受け皿を作成
   x_nm <- matrix(NA, nrow = length(x_n), ncol = M)
@@ -24,14 +24,7 @@ x_vector <- function(x_n, M) {
 # 真の次元数を指定
 M_truth <- 4
 
-# ノイズ成分の標準偏差を指定
-sigma <- 1.5
-
-# ノイズ成分の精度を計算
-lambda <- 1 / sigma^2
-lambda
-
-# パラメータを生成
+# 真のパラメータを生成
 w_truth_m <- sample(x = seq(-1, 1, by = 0.1), size = M_truth)
 w_truth_m
 
@@ -42,17 +35,17 @@ x_line <- seq(-3, 3, by = 0.01)
 # 作図用のxをM次元に拡張
 x_truth_mat <- x_vector(x_line, M_truth)
 
-# 真の観測モデルをデータフレームに格納
+# 真のモデルをデータフレームに格納
 model_df <- tibble(
   x = x_line, 
   y = as.vector(t(w_truth_m) %*% t(x_truth_mat))
 )
 
-# 真の観測モデルを作図
+# 真のモデルを作図
 ggplot(model_df, aes(x = x, y = y)) + 
   geom_line() + 
   labs(title = "Observation Model", 
-       subtitle = paste0("w=(", paste0(round(w_truth_m, 1), collapse = ', '), ")"))
+       subtitle = paste0("w=(", paste0(w_truth_m, collapse = ', '), ")"))
 
 
 ## 観測データの生成 -----
@@ -66,10 +59,18 @@ x_n <- sample(seq(min(x_line), max(x_line), by = 0.01), size = N, replace = TRUE
 # 入力値をM次元に拡張
 x_truth_nm <- x_vector(x_n, M_truth)
 
+
+# ノイズ成分の標準偏差を指定
+sigma <- 1.5
+
+# ノイズ成分の精度を計算
+lambda <- 1 / sigma^2
+lambda
+
 # ノイズ成分を生成
 epsilon_n <- rnorm(n = N, mean = 0, sd = sqrt(1 / lambda))
 
-# 出力値を計算
+# 出力値を計算:式(3.141)
 y_n <- (t(w_truth_m) %*% t(x_truth_nm) + epsilon_n) %>% 
   as.vector()
 y_n
@@ -95,12 +96,10 @@ ggplot() +
 # 事前分布の次元数を指定
 M <- 5
 
-# 事前分布の平均を指定
+# 事前分布のパラメータを指定
 m_m <- rep(0, M)
-
-# 事前分布の精度行列を指定
-sigma_mm <- diag(M) * 100
-lambda_mm <- solve(sigma_mm)
+sigma_mm <- diag(M) * 10
+lambda_mm <- solve(sigma_mm^2)
 lambda_mm
 
 
@@ -110,7 +109,7 @@ x_nm <- x_vector(x_n, M)
 # 作図用のxをM次元に拡張
 x_mat <- x_vector(x_line, M)
 
-# 事前分布からのwのサンプリング
+# 事前分布からサンプリングしたwを用いたモデルを比較
 prior_df <- tibble()
 for(i in 1:5) { # サンプルサイズを指定
   # パラメータを生成
@@ -128,11 +127,11 @@ for(i in 1:5) { # サンプルサイズを指定
   prior_df <- rbind(prior_df, tmp_df)
 }
 
-# 事前分布からサンプリングしたパラメータによる分布を作図
+# 事前分布からサンプリングしたパラメータによるモデルを作図
 ggplot() + 
   geom_line(data = prior_df, aes(x = x, y = y, color = smp_num)) + # サンプリングしたwを用いたモデル
   geom_line(data = model_df, aes(x =x, y = y), color = "blue", linetype = "dashed") + # 真のモデル
-  ylim(min(model_df[["y"]]), max(model_df[["y"]])) + # y軸の表示範囲
+  ylim(min(model_df[["y"]]) - 3 * sigma, max(model_df[["y"]]) + 3 * sigma) + # y軸の表示範囲
   labs(title = "Sampling from Prior Distribution", 
        subtitle = paste0("m=(", paste0(m_m, collapse = ", "), ")"))
 
@@ -141,10 +140,11 @@ ggplot() +
 
 # 事後分布のパラメータを計算:式(3.148)
 lambda_hat_mm <- lambda * t(x_nm) %*% x_nm + lambda_mm
-m_hat_m <- solve(lambda_hat_mm) %*% (lambda * t(t(y_n) %*% x_nm) + lambda_mm %*% matrix(m_m))
+m_hat_m <- solve(lambda_hat_mm) %*% (lambda * t(t(y_n) %*% x_nm) + lambda_mm %*% matrix(m_m)) %>% 
+  as.vector()
 
 
-# 事後分布からのwのサンプリングによるモデルを比較
+# 事後分布からサンプリングしたwを用いたモデルを比較
 posterior_df <- tibble()
 for(i in 1:5) { # サンプルサイズを指定
   # パラメータを生成
@@ -162,14 +162,14 @@ for(i in 1:5) { # サンプルサイズを指定
   posterior_df <- rbind(posterior_df, tmp_df)
 }
 
-# 事後分布からサンプリングしたパラメータによる分布を作図
+# 事後分布からサンプリングしたパラメータによるモデルを作図
 ggplot() + 
   geom_line(data = posterior_df, aes(x = x, y = y, color = smp_num)) + # サンプリングしたwを用いたモデル
   geom_line(data = model_df, aes(x = x, y = y), color = "blue", linetype = "dashed") + # 真のモデル
   geom_point(data = sample_df, aes(x, y)) + # 観測データ
-  #ylim(min(model_df[["y"]]), max(model_df[["y"]])) + # y軸の表示範囲
+  ylim(min(model_df[["y"]]) - 3 * sigma, max(model_df[["y"]]) + 3 * sigma) + # y軸の表示範囲
   labs(title = "Sampling from Posterior Distribution", 
-       subtitle = paste0("N=", N, ", m=(", paste0(round(m_hat_m, 2), collapse = ", "), ")"))
+       subtitle = paste0("N=", N, ", m_hat=(", paste0(round(m_hat_m, 2), collapse = ", "), ")"))
   
 
 ### 予測分布の計算 -----
@@ -198,7 +198,7 @@ ggplot() +
   geom_point(data = sample_df, aes(x = x, y = y)) + # 観測データ
   ylim(min(model_df[["y"]]) - 3 * sigma, max(model_df[["y"]]) + 3 * sigma) + # y軸の表示範囲
   labs(title = "Predictive Distribution", 
-       subtitle = paste0("N=", N, ", m=(", paste0(round(m_hat_m, 2), collapse = ", "), ")"), 
+       subtitle = paste0("N=", N, ", m_hat=(", paste0(round(m_hat_m, 2), collapse = ", "), ")"), 
        y = "y")
 
 
@@ -212,7 +212,7 @@ library(gganimate)
 
 ### モデルの構築 -----
 
-# ベクトル(1, x^1, ..., x^(m-1))の作成関数を定義
+# {x^(m-1)}ベクトル作成関数を定義
 x_vector <- function(x_n, M) {
   # 受け皿を作成
   x_nm <- matrix(NA, nrow = length(x_n), ncol = M)
@@ -256,18 +256,13 @@ ggplot(model_df, aes(x = x, y = y)) +
        subtitle = paste0("w=(", paste0(round(w_truth_m, 1), collapse = ', '), ")"))
 
 
-### 推論処理 -----
-
-# (観測)データ数(試行回数)を指定
-N <- 100
+### 事前分布の設定 -----
 
 # 事前分布の次元数を指定
 M <- 5
 
-# 事前分布の平均を指定
+# 事前分布のパラメータを指定
 m_m <- rep(0, M)
-
-# 事前分布の精度行列を指定
 lambda_mm <- diag(M) * 0.01
 solve(lambda_mm)
 
@@ -295,6 +290,11 @@ predict_df <- tibble(
 )
 
 
+### 推論処理 -----
+
+# (観測)データ数(試行回数)を指定
+N <- 100
+
 # 受け皿を初期化
 x_n <- rep(NA, N)
 y_n <- rep(NA, N)
@@ -318,12 +318,13 @@ for(n in 1:N) {
   # 入力値をM次元に拡張
   x_1m <- x_vector(x_n[n], M)
   
-  # 事後分布のパラメータを計算:式(3.148)
+  # 事後分布のパラメータを更新:式(3.148)
   old_lambda_mm <- lambda_mm
   lambda_mm <- lambda * t(x_1m) %*% x_1m + lambda_mm
-  m_m <- solve(lambda_mm) %*% (lambda * y_n[n] * t(x_1m) + old_lambda_mm %*% matrix(m_m))
+  m_m <- solve(lambda_mm) %*% (lambda * y_n[n] * t(x_1m) + old_lambda_mm %*% matrix(m_m)) %>% 
+    as.vector()
   
-  # 予測分布のパラメータを計算:式(3.155')
+  # 予測分布のパラメータを更新:式(3.155')
   mu_star_line <- t(m_m) %*% t(x_mat) %>% 
     as.vector()
   sigma2_star_line <- 1 / lambda + x_mat %*% solve(lambda_mm) %*% t(x_mat) %>% 
@@ -335,10 +336,12 @@ for(n in 1:N) {
     y = as.vector(y_n[1:n]), 
     label = as.factor(
       paste0(
-        "N=", n, ", m=(", paste(round(m_m, 2), collapse = ", "), ")"
+        "N=", n, ", m_hat=(", paste(round(m_m, 2), collapse = ", "), ")"
       )
     )
   )
+  
+  # 結果を結合
   x_df <- rbind(x_df, tmp_x_df)
   
   # 予測分布を計算
@@ -349,10 +352,12 @@ for(n in 1:N) {
     plus_sigma_y = E_y + sqrt(sigma2_star_line), 
     label = as.factor(
       paste0(
-        "N=", n, ", m=(", paste(round(m_m, 2), collapse = ", "), ")"
+        "N=", n, ", m_hat=(", paste(round(m_m, 2), collapse = ", "), ")"
       )
     )
   )
+  
+  # 結果を結合
   predict_df <- rbind(predict_df, tmp_predict_df)
 }
 
@@ -388,7 +393,7 @@ library(gganimate)
 
 ### モデルの構築 -----
 
-# ベクトル(1, x^1, ..., x^(m-1))の作成関数を定義
+# {x^(m-1)}ベクトル作成関数を定義
 x_vector <- function(x_n, M) {
   # 受け皿を作成
   x_nm <- matrix(NA, nrow = length(x_n), ncol = M)
@@ -434,7 +439,7 @@ ggplot(model_df, aes(x = x, y = y)) +
 
 ### 観測データの生成 -----
 
-# (観測)データ数(試行回数)を指定
+# (観測)データ数を指定
 N <- 5
 
 # 入力値を生成
@@ -500,10 +505,12 @@ for(m in 1:M_max) {
     plus_sigma_y = E_y + sqrt(sigma2_star_hat_line), 
     label = as.factor(
       paste0(
-        "N=", N, ", M=", m, ", m=(", paste(round(m_hat_m, 2), collapse = ", "), ")"
+        "N=", N, ", M=", m, ", m_hat=(", paste(round(m_hat_m, 2), collapse = ", "), ")"
       )
     )
   )
+  
+  # 結果を結合
   predict_df <- rbind(predict_df, tmp_predict_df)
 }
 
