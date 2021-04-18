@@ -78,7 +78,7 @@ lmd = 1.0 / sigma**2
 print(lmd)
 
 # ノイズ成分を生成
-epsilon_n = np.random.normal(loc=0.0, scale=1 / lmd, size=N)
+epsilon_n = np.random.normal(loc=0.0, scale=np.sqrt(1 / lmd), size=N)
 
 # 出力値を計算:式(3.141)
 y_n = np.dot(w_truth_m.reshape((1, M_truth)), x_truth_nm.T).flatten() + epsilon_n
@@ -106,8 +106,10 @@ plt.show()
 # 事前分布の次元数を指定
 M = 5
 
-# 事前分布のパラメータを指定
+# 事前分布の平均を指定
 m_m = np.zeros(M)
+
+# 事前分布の精度行列を指定
 sigma_mm = np.identity(M) * 10
 lambda_mm = np.linalg.inv(sigma_mm**2)
 print(lambda_mm)
@@ -209,7 +211,7 @@ print(sigma2_star_hat_line[:5])
 #%%
 
 # 予測分布を作図
-fig = plt.figure(figsize=(12, 8))
+fig = plt.figure(figsize=(12, 9))
 plt.plot(x_line, mu_star_hat_line, color='orange', label='predict') # 予測分布の期待値
 plt.fill_between(x=x_line, 
                  y1=mu_star_hat_line - np.sqrt(sigma2_star_hat_line), 
@@ -242,7 +244,7 @@ import matplotlib.animation as animation
 
 #%%
 
-## モデルの構築
+## モデルの設定
 
 # {x^(m-1)}ベクトル作成関数を定義
 def x_vector(x_n, M):
@@ -254,7 +256,6 @@ def x_vector(x_n, M):
         x_nm[:, m] = np.power(x_n, m)
     return x_nm
 
-#%%
 
 # 真の次元数を指定
 M_truth = 4
@@ -272,14 +273,12 @@ w_truth_m = np.random.choice(
 )
 print(w_truth_m)
 
+
 # 作図用のx軸の値を作成
 x_line = np.arange(-3.0, 3.0, step=0.01)
 
 # 真のモデルの出力を計算
 y_line = np.dot(w_truth_m.reshape((1, M_truth)), x_vector(x_line, M_truth).T).flatten()
-print(y_line[:5])
-
-#%%
 
 # 真のモデルを作図
 fig = plt.figure(figsize=(12, 9))
@@ -293,10 +292,10 @@ plt.show()
 
 #%%
 
-## 事前分布(多次元ガウス分布)の設定
+## 事前分布の設定
 
 # 事前分布の次元数を指定
-M = 10
+M = 5
 
 # 事前分布のパラメータを指定
 m_m = np.zeros(M)
@@ -312,7 +311,6 @@ sigma2_star_line = np.diag(
     x_arr.dot(np.linalg.inv(lambda_mm)).dot(x_arr.T)
 ) + 1 / lmd
 
-#%%
 
 ## 推論処理
 
@@ -336,7 +334,7 @@ for n in range(N):
     
     # 出力値を計算:式(3.141)
     term_y = np.dot(w_truth_m.reshape((1, M_truth)), x_vector(x_n[n].reshape((1, 1)), M_truth).T)
-    term_eps = np.random.normal(loc=0.0, scale=1 / lmd, size=1) # ノイズ成分
+    term_eps = np.random.normal(loc=0.0, scale=np.sqrt(1 / lmd), size=1) # ノイズ成分
     y_n[n] = term_y + term_eps
     
     # 入力値をM次元に拡張
@@ -365,7 +363,7 @@ for n in range(N):
 ## 予測分布の推移をgif画像化
 
 # 画像サイズを指定
-fig = plt.figure(figsize=(10, 7.5))
+fig = plt.figure(figsize=(12, 9))
 
 # 作図処理を関数として定義
 def update_predict(n):
@@ -405,7 +403,7 @@ import matplotlib.animation as animation
 
 #%%
 
-## モデルの構築
+## モデルの設定
 
 # {x^(m-1)}ベクトル作成関数を定義
 def x_vector(x_n, M):
@@ -417,7 +415,6 @@ def x_vector(x_n, M):
         x_nm[:, m] = np.power(x_n, m)
     return x_nm
 
-#%%
 
 # 真の次元数を指定
 M_truth = 4
@@ -440,14 +437,12 @@ x_line = np.arange(-3.0, 3.0, step=0.01)
 
 # 真のモデルの出力を計算
 y_line = np.dot(w_truth_m.reshape((1, M_truth)), x_vector(x_line, M_truth).T).flatten()
-print(y_line[:5])
 
-#%%
 
 ## 観測データの生成
 
 # (観測)データ数を指定
-N = 5
+N = 10
 
 # 入力値を生成
 x_n = np.random.choice(
@@ -455,12 +450,10 @@ x_n = np.random.choice(
 )
 
 # ノイズ成分を生成
-epsilon_n = np.random.normal(loc=0.0, scale=1 / lmd, size=N)
+epsilon_n = np.random.normal(loc=0.0, scale=np.sqrt(1 / lmd), size=N)
 
 # 出力値を計算:式(3.141)
 y_n = np.dot(w_truth_m.reshape(1, M_truth), x_vector(x_n, M_truth).T) + epsilon_n
-
-#%%
 
 # 観測データの散布図を作成
 fig = plt.figure(figsize=(12, 9))
@@ -476,6 +469,8 @@ plt.grid() # グリッド線
 plt.show()
 
 #%%
+
+## 推論処理
 
 # 事前分布の次元数の最大値(試行回数)を指定
 M_max = 15
@@ -520,7 +515,7 @@ for m in range(1, M_max + 1):
 ## 予測分布の推移をgif画像化
 
 # 画像サイズを指定
-fig = plt.figure(figsize=(10, 7.5))
+fig = plt.figure(figsize=(12, 9))
 
 # 作図処理を関数として定義
 def update_predict(i):
@@ -538,7 +533,7 @@ def update_predict(i):
     plt.xlabel('x')
     plt.ylabel('y')
     plt.suptitle('Predict Distribution', fontsize=20)
-    plt.title('$N=' + str(N) + 
+    plt.title('$N=' + str(N) + ', M=' + str(i + 1) + 
               ', \hat{m}=[' + ', '.join([str(m) for m in np.round(trace_m[i], 2)]) + ']$', 
               loc='left', fontsize=20)
     plt.ylim((min(y_line) - 3 * sigma, max(y_line) + 3 * sigma)) # y軸の表示範囲
