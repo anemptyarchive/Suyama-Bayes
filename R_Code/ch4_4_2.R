@@ -1,144 +1,209 @@
 
-# ch4.4.2 ガウス混合モデルにおけるギブスサンプリング -------------------------------------------
+# 4.4.2 ガウス混合モデルにおける推論：ギブスサンプリング -------------------------------------------
 
-# 利用パッケージ
+# 4.4.2項で利用するパッケージ
 library(tidyverse)
 library(mvnfast)
 library(MCMCpack)
 
 
-# モデルの設定 ------------------------------------------------------------------
+### 観測モデルの設定 -----
 
-# 真の観測モデルのパラメータを指定
-D <- 2 # (固定)
+# 次元数を設定:(固定)
+D <- 2
+
+# クラスタ数を指定
 K <- 3
-mu_true_kd <- matrix(
-  c(0, 4, 
-    -5, -5, 
-    5, -2.5), nrow = K, ncol = D, byrow = TRUE
+
+# 真の平均を指定
+mu_truth_kd <- matrix(
+  c(5, 35, 
+    -20, -10, 
+    30, -20), nrow = K, ncol = D, byrow = TRUE
 )
-sigma2_true_ddk <- array(
-  c(8, 0, 0, 8, 
-    4, -2.5, -2.5, 4, 
-    6.5, 4, 4, 6.5), dim = c(D, D, K)
+
+# 真の分散共分散行列を指定
+sigma2_truth_ddk <- array(
+  c(250, 65, 65, 270, 
+    125, -45, -45, 175, 
+    210, -15, -15, 250), dim = c(D, D, K)
 )
 
 # 真の混合比率を指定
-pi_true_k <- c(0.5, 0.2, 0.3)
+pi_truth_k <- c(0.45, 0.25, 0.3)
 
 
-# 観測データの真のクラスタを生成
+# 作図用の点を生成
+x_1_vec <- seq(
+  min(mu_truth_kd[, 1] - 3 * sqrt(sigma2_truth_ddk[1, 1, ])), 
+  max(mu_truth_kd[, 1] + 3 * sqrt(sigma2_truth_ddk[1, 1, ])), 
+  length.out = 300)
+x_2_vec <- seq(
+  min(mu_truth_kd[, 2] - 3 * sqrt(sigma2_truth_ddk[2, 2, ])), 
+  max(mu_truth_kd[, 2] + 3 * sqrt(sigma2_truth_ddk[2, 2, ])), 
+  length.out = 300
+)
+x_point_mat <- cbind(
+  rep(x_1_vec, times = length(x_2_vec)), 
+  rep(x_2_vec, each = length(x_1_vec))
+)
+
+# 観測モデルを計算
+model_density <- 0
+for(k in 1:K) {
+  # クラスタkの確率密度を計算
+  tmp_density <- mvnfast::dmvn(
+    X = x_point_mat, mu = mu_truth_kd[k, ], sigma = sigma2_truth_ddk[, , k]
+  )
+  
+  # K個の確率密度の加重平均を計算
+  model_density <- model_density + tmp_density * pi_truth_k[k]
+}
+
+# 観測モデルをデータフレームに格納
+model_df <- tibble(
+  x_1 = x_point_mat[, 1], 
+  x_2 = x_point_mat[, 2], 
+  density = model_density
+)
+
+# 観測モデルを作図
+ggplot(model_df, aes(x = x_1, y = x_2, z = density, color = ..level..)) + 
+  geom_contour() + # 真の分布
+  labs(title = "Gaussian Mixture Model", 
+       subtitle = paste0('K=', K), 
+       x = expression(x[1]), y = expression(x[2]))
+
+
+### 観測データの生成 -----
+
+# (観測)データ数を指定
 N <- 250
-s_true_nk <- rmultinom(n = N, size = 1, prob = pi_true_k) %>% 
+
+# クラスタを生成
+s_truth_nk <- rmultinom(n = N, size = 1, prob = pi_truth_k) %>% 
   t()
-res_s <- which(t(s_true_nk) == 1, arr.ind = TRUE)
-s_true_n <- res_s[, "row"]
+s_truth_n <- which(t(s_truth_nk) == 1, arr.ind = TRUE) %>% 
+  .[, "row"]
 
 # 観測データを生成
 x_nd <- matrix(0, nrow = N, ncol = D)
 for(n in 1:N) {
-  k <- s_true_n[n] # クラスタを取得
-  x_nd[n, ] = mvnfast::rmvn(n = 1, mu = mu_true_kd[k, ], sigma = sigma2_true_ddk[, , k])
+  # n番目のデータのクラスタを取得
+  k <- s_truth_n[n]
+  
+  # n番目のデータを生成
+  x_nd[n, ] = mvnfast::rmvn(n = 1, mu = mu_truth_kd[k, ], sigma = sigma2_truth_ddk[, , k])
 }
 
-
-# 作図用の点を生成
-x_line <- seq(-10, 10, by = 0.1)
-point_df <- tibble(
-  x1 = rep(x_line, times = length(x_line)), 
-  x2 = rep(x_line, each = length(x_line))
+# 観測データと真のクラスタをデータフレームに格納
+x_df <- tibble(
+  x_n1 = x_nd[, 1], 
+  x_n2 = x_nd[, 2], 
+  cluster = as.factor(s_truth_n)
 )
 
-# 作図用のデータフレームを作成
-model_true_df <- tibble()
-sample_df <- tibble()
-for(k in 1:K) {
-  # 真の観測モデルを計算
-  tmp_model_df <- cbind(
-    point_df, 
-    density = mvnfast::dmvn(
-      X = as.matrix(point_df), mu = mu_true_kd[k, ], sigma = sigma2_true_ddk[, , k]
-    ), 
-    cluster = as.factor(k)
-  )
-  model_true_df <- rbind(model_true_df, tmp_model_df)
-  
-  # 観測データのデータフレーム
-  k_idx <- which(s_true_n == k)
-  tmp_sample_df <- tibble(
-    x1 = x_nd[k_idx, 1], 
-    x2 = x_nd[k_idx, 2], 
-    cluster = as.factor(k)
-  )
-  sample_df <- rbind(sample_df, tmp_sample_df)
-}
-
-# 真の観測モデルを作図
+# 観測データの散布図を作成
 ggplot() + 
-  geom_contour(data = model_true_df, aes(x1, x2, z = density, color = cluster)) + # 真の観測モデル
-  geom_point(data = sample_df, aes(x1, x2, color = cluster)) + # 真の観測データ
+  geom_contour(data = model_df, aes(x = x_1, y = x_2, z = density), 
+               linetype = "dashed") + # 真の分布
+  geom_point(data = x_df, aes(x = x_n1, y = x_n2, color = cluster)) + # 真のクラスタ
   labs(title = "Gaussian Mixture Model", 
-       subtitle = paste0('K=', K, ', N=', N), 
+       subtitle = paste0('N=', N, ", pi=(", paste0(pi_truth_k, collapse = ", "), ")"), 
        x = expression(x[1]), y = expression(x[2]))
 
 
-# 推論処理 --------------------------------------------------------------------
+### 事前分布(ガウス・ウィシャート分布)の設定 -----
 
-# 観測モデルのパラメータの初期値を指定
-mu_kd <- matrix(0, nrow = K, ncol = D)
-solve(diag(D) * 100)
-lambda_ddk <- array(
-  c(0.01, 0, 0, 0.01, 
-    0.01, 0, 0, 0.01, 
-    0.01, 0, 0, 0.01), dim = c(D, D, K)
-)
-
-# 混合比率の初期値を指定
-pi_k <- sample(seq(0, 1, by = 0.01), size = K)
-pi_k <- pi_k / sum(pi_k) # 正規化
-
-
-# 事前分布のパラメータを指定
+# muの事前分布のパラメータを指定
 beta <- 1
 m_d <- rep(0, D)
+
+# lambdaの事前分布のパラメータを指定
 nu <- D
-w_dd <- diag(D) * 10
+w_dd <- diag(D) * 0.0005
+sqrt(solve(beta * nu * w_dd)) # (似非)相関行列の平均
+
+# piの事前分布のパラメータを指定
 alpha_k <- rep(1, K)
 
-# 試行回数を指定
-MaxIter <- 100
 
-# 推移の確認用の受け皿
+# 観測モデルのパラメータをサンプル
+mu_kd <- matrix(0, nrow = K, ncol = D)
+lambda_ddk <- array(0, dim = c(D, D, K))
+for(k in 1:K) {
+  # クラスタkの精度行列をサンプル
+  lambda_ddk[, , k] <- rWishart(n = 1, df = nu, Sigma = w_dd)
+  
+  # クラスタkの平均をサンプル
+  mu_kd[k, ] <- mvnfast::rmvn(n = 1, mu = m_d, sigma = solve(beta * lambda_ddk[, , k]))
+}
+
+# 混合比率をサンプル
+pi_k <- MCMCpack::rdirichlet(n = 1, alpha = alpha_k) %>% 
+  as.vector()
+
+
+# 事前分布からサンプルした分布を計算
+init_density <- 0
+for(k in 1:K) {
+  # クラスタkの確率密度を計算
+  tmp_density <- mvnfast::dmvn(
+    X = x_point_mat, mu = mu_kd[k, ], sigma = solve(lambda_ddk[, , k])
+  )
+  
+  # K個の確率密度の加重平均を計算
+  init_density <- init_density + tmp_density * pi_k[k]
+}
+
+# 事前分布からサンプルしたパラメータによる分布データフレームに格納
+init_df <- tibble(
+  x_1 = x_point_mat[, 1], 
+  x_2 = x_point_mat[, 2], 
+  density = init_density
+)
+
+# 事前分布からサンプルしたパラメータによる分布を作図
+ggplot() + 
+  geom_contour(data = init_df, aes(x = x_1, y = x_2, z = density, color = ..level..)) + # サンプルした分布
+  labs(title = "Gaussian Mixture Model", 
+       subtitle = paste0('K=', K), 
+       x = expression(x[1]), y = expression(x[2]))
+
+
+### 推論処理 -----
+
+# 試行回数を指定
+MaxIter <- 500
+
+# 推移の確認用の受け皿を初期化
 trace_s_in <- matrix(0, nrow = MaxIter, ncol = N)
-trace_mu_ikd <- array(0, dim = c(MaxIter+1, K, D))
-trace_lambda_iddk <- array(0, dim = c(MaxIter+1, D, D, K))
-trace_mu_ikd[1, , ] <- mu_kd
-trace_lambda_iddk[1, , , ] <- lambda_ddk
+trace_mu_ikd <- array(0, dim = c(MaxIter, K, D))
+trace_lambda_iddk <- array(0, dim = c(MaxIter, D, D, K))
 
 # ギブスサンプリング
 for(i in 1:MaxIter) {
   
-  # 初期化
+  # パラメータを初期化
   eta_nk <- matrix(0, nrow = N, ncol = K)
   s_nk <- matrix(0, nrow = N, ncol = K)
   beta_hat_k <- rep(0, K)
   m_hat_kd <- matrix(0, nrow = K, ncol = D)
-  nu_hat_k <- rep(0, K)
   w_hat_ddk <- array(0, dim = c(D, D, K))
+  nu_hat_k <- rep(0, K)
   alpha_hat_k <- rep(0, K)
   
   # 潜在変数のパラメータを計算:式(4.94)
   for(k in 1:K) {
-    tmp_term_dn <- t(x_nd) - mu_kd[k, ]
-    tmp_eta_n <- diag(
-      t(tmp_term_dn) %*% lambda_ddk[, , k] %*% tmp_term_dn
-    )
-    tmp_eta <- 0.5 * log(det(lambda_ddk[, , k]) + 1e-7) + log(pi_k[k] + 1e-7)
-    eta_nk[, k] <- exp(-0.5 * tmp_eta_n + tmp_eta)
+    tmp_x_dn <- t(x_nd) - mu_kd[k, ]
+    term_x_n <- (t(tmp_x_dn) %*% lambda_ddk[, , k] %*% tmp_x_dn) %>% 
+      diag()
+    term_ln <- 0.5 * log(det(lambda_ddk[, , k]) + 1e-7) + log(pi_k[k] + 1e-7)
+    eta_nk[, k] <- exp(term_ln - 0.5 * term_x_n)
   }
   eta_nk <- eta_nk / rowSums(eta_nk) # 正規化
   
-  # 潜在変数をサンプル
+  # 潜在変数をサンプル:式(4.39)
   for(n in 1:N) {
     s_nk[n, ] <- rmultinom(n = 1, size = 1, prob = eta_nk[n, ]) %>% 
       as.vector()
@@ -152,18 +217,17 @@ for(i in 1:MaxIter) {
     m_hat_kd[k, ] <- (colSums(s_nk[, k] * x_nd) + beta * m_d) / beta_hat_k[k]
     
     # lambdaの事後分布のパラメータを計算:式(4.103)
-    nu_hat_k[k] <- sum(s_nk[, k]) + nu
-    tmp_w1_dd <- t(s_nk[, k] * x_nd) %*% x_nd
-    tmp_w2_dd <- beta * matrix(m_d) %*% t(m_d)
-    tmp_w3_dd <- beta_hat_k[k] * matrix(m_hat_kd[k, ]) %*% t(m_hat_kd[k, ])
+    term_x_dd <- t(s_nk[, k] * x_nd) %*% x_nd
+    term_m_dd <- beta * matrix(m_d) %*% t(m_d)
+    term_m_hat_dd <- beta_hat_k[k] * matrix(m_hat_kd[k, ]) %*% t(m_hat_kd[k, ])
     w_hat_ddk[, , k] <- solve(
-      tmp_w1_dd + tmp_w2_dd - tmp_w3_dd + solve(w_dd)
+      term_x_dd + term_m_dd - term_m_hat_dd + solve(w_dd)
     )
+    nu_hat_k[k] <- sum(s_nk[, k]) + nu
     
     # lambdaをサンプル:式(4.102)
     lambda_ddk[, , k] <- rWishart(n = 1, df = nu_hat_k[k], Sigma = w_hat_ddk[, , k])
-    #lambda_ddk[, , k] <- MCMCpack::rwish(v = nu_hat_k[k], S = w_hat_ddk[, , k])
-    
+
     # muをサンプル:式(4.98)
     mu_kd[k, ] <- mvnfast::rmvn(
       n = 1, mu = m_hat_kd[k, ], sigma = solve(beta_hat_k[k] * lambda_ddk[, , k])
@@ -171,161 +235,202 @@ for(i in 1:MaxIter) {
       as.vector()
   }
   
-  # 混合比率のパラメータを計算:式(4.45)
+  # 混合比率の事後分布のパラメータを計算:式(4.45)
   alpha_hat_k <- colSums(s_nk) + alpha_k
   
   # piをサンプル:式(4.44)
   pi_k <- MCMCpack::rdirichlet(n = 1, alpha = alpha_hat_k) %>% 
     as.vector()
   
-  # 値を記録
-  res_s <- which(t(s_nk) == 1, arr.ind = TRUE)
-  trace_s_in[i, ] <- res_s[, "row"]
-  trace_mu_ikd[i+1, , ] <- mu_kd
-  trace_lambda_iddk[i+1, , , ] <- lambda_ddk
+  # パラメータを記録
+  trace_s_in[i, ] <- which(t(s_nk) == 1, arr.ind = TRUE) %>% 
+    .[, "row"]
+  trace_mu_ikd[i, , ] <- mu_kd
+  trace_lambda_iddk[i, , , ] <- lambda_ddk
   
   # 動作確認
   print(paste0(i, ' (', round(i / MaxIter * 100, 1), '%)'))
 }
 
 
-# 作図用のデータフレームを作成
-model_df <- tibble()
-sample_df <- tibble()
+### 分布を作図 -----
+
+# 最後にサンプルしたパラメータによる分布を計算
+res_density <- 0
 for(k in 1:K) {
-  # 近似事後分布を計算
-  tmp_model_df <- cbind(
-    point_df, 
-    density = mvnfast::dmvn(
-      as.matrix(point_df), mu = mu_kd[k, ], sigma = solve(lambda_ddk[, , k])
-    ), 
-    cluster = as.factor(k)
+  # クラスタkの確率密度を計算
+  tmp_density <- mvnfast::dmvn(
+    X = x_point_mat, mu = mu_kd[k, ], sigma = solve(lambda_ddk[, , k])
   )
-  model_df <- rbind(model_df, tmp_model_df)
   
-  # 観測データのクラスタを抽出
-  k_idx <- which(s_nk[, k] == 1)
-  tmp_sample_df <- tibble(
-    x1 = x_nd[k_idx, 1], 
-    x2 = x_nd[k_idx, 2], 
-    cluster = as.factor(k)
-  )
-  sample_df <- rbind(sample_df, tmp_sample_df)
+  # K個の確率密度の加重平均を計算
+  res_density <- res_density + tmp_density * pi_k[k]
 }
 
-# 近似事後分布を作図
+# 最後的な分布をデータフレームに格納
+res_df <- tibble(
+  x_1 = x_point_mat[, 1], 
+  x_2 = x_point_mat[, 2], 
+  density = res_density
+)
+
+# 真の平均をデータフレームに格納
+mu_df <- tibble(
+  x_1 = mu_truth_kd[, 1], 
+  x_2 = mu_truth_kd[, 2]
+)
+
+# 最終的な分布を作図
 ggplot() + 
-  geom_contour(data = model_df, aes(x1, x2, z = density, color = cluster)) + # 近似事後分布
-  geom_contour(data = model_true_df, aes(x1, x2, z = density, color = cluster), 
-               linetype = "dotted", alpha = 0.6) + # 真の観測モデル
-  geom_point(data = sample_df, aes(x1, x2, color = cluster)) + # 観測データ
-  labs(title = "Gibbs Sampling", 
-       subtitle = paste0('K=', K, ', N=', N, ', iter:', MaxIter), 
+  geom_contour(data = model_df, aes(x = x_1, y = x_2, z = density, color = ..level..), 
+               alpha = 0.5, linetype = "dashed") + # 真の分布
+  geom_point(data = mu_df, aes(x = x_1, y = x_2), color = "red", shape = 4, size = 5) + # 真の平均
+  geom_contour(data = res_df, aes(x = x_1, y = x_2, z = density, color = ..level..)) + # サンプルした分布
+  geom_point(data = x_df, aes(x = x_n1, y = x_n2)) + # 観測データ
+  labs(title = "Gaussian Mixture Model:Gibbs Sampling", 
+       subtitle = paste0("N=", N, ", K=", K), 
        x = expression(x[1]), y = expression(x[2]))
 
 
-# 作図用のデータフレームを作成
-trace_mu_df <- tibble()
-trace_lambda_df <- tibble()
-for(k in 1:K) {
-  for(d1 in 1:D) {
-    # muの値を取得
-    tmp_mu_df <- tibble(
-      iteration = seq(0, MaxIter), 
-      value = trace_mu_ikd[, k, d1], 
-      label = as.factor(
-        paste0("k=", k, ", d=", d1)
-      )
+# 観測データとサンプルしたクラスタをデータフレームに格納
+s_df <- tibble(
+  x_n1 = x_nd[, 1], 
+  x_n2 = x_nd[, 2], 
+  cluster = which(t(s_nk) == 1, arr.ind = TRUE) %>% 
+    .[, "row"] %>% 
+    as.factor()
+)
+
+# 最終的なクラスタを作図
+ggplot() + 
+  geom_contour(data = model_df, aes(x = x_1, y = x_2, z = density), 
+               color = "red", alpha = 0.5, linetype = "dashed") + # 真の分布
+  geom_point(data = mu_df, aes(x = x_1, y = x_2), color = "red", shape = 4, size = 5) + # 真の平均
+  geom_contour_filled(data = res_df, aes(x = x_1, y = x_2, z = density, fill = ..level..), alpha = 0.6) + # サンプルした分布
+  geom_point(data = s_df, aes(x = x_n1, y = x_n2, color = cluster)) + # サンプルしたクラスタ
+  labs(title = "Gaussian Mixture Model:Gibbs Sampling", 
+       subtitle = paste0("N=", N, ", K=", K), 
+       x = expression(x[1]), y = expression(x[2]))
+
+
+### パラメータの推移を確認 -----
+
+# muの推移を作図
+as_tibble(trace_mu_ikd) %>% # データフレームに変換
+  magrittr::set_names(
+    paste0(rep(paste0("k=", 1:K), D), rep(paste0(", d=", 1:D), each = K))
+  ) %>% # 列名として次元情報を付与
+  cbind(iteration = 1:MaxIter) %>% # 試行回数列を追加
+  tidyr::pivot_longer(
+    cols = -iteration, 
+    names_to = "dim", 
+    values_to = "value"
+  ) %>% # 縦持ちに変換
+  ggplot(aes(x = iteration, y = value, color = dim)) + 
+    geom_line() + 
+    labs(title = "Gibbs Sampling", 
+         subtitle = expression(mu))
+
+# lambdaの推移を作図
+as_tibble(trace_lambda_iddk) %>% # データフレームに変換
+  magrittr::set_names(
+    paste0(
+      rep(paste0("d=", 1:D), times = D * K), 
+      rep(rep(paste0(", d=", 1:D), each = D), times = K), 
+      rep(paste0(", k=", 1:K), each = D * D)
     )
-    trace_mu_df <- rbind(trace_mu_df, tmp_mu_df)
-    
-    for(d2 in 1:D) {
-      # lambdaの値を取得
-      tmp_lambda_df <- tibble(
-        iteration = seq(0, MaxIter), 
-        value = trace_lambda_iddk[, d1, d2, k], 
-        label = as.factor(
-          paste0("k=", k, ", d=", d1, ", d'=", d2)
-        )
-      )
-      trace_lambda_df <- rbind(trace_lambda_df, tmp_lambda_df)
-    }
-  }
-}
-
-# muの推移を確認
-ggplot(trace_mu_df, aes(x = iteration, y = value, color = label)) + 
-  geom_line() + 
-  labs(title = "Gibbs Sampling", 
-       subtitle = expression(bold(mu)))
-
-# lambdaの推移を確認
-ggplot(trace_lambda_df, aes(x = iteration, y = value, color = label)) + 
-  geom_line() + 
-  labs(title = "Gibbs Sampling", 
-       subtitle = expression(bolditalic(Lambda)))
+  ) %>% # 列名として次元情報を付与
+  cbind(iteration = 1:MaxIter) %>% # 試行回数列を追加
+  tidyr::pivot_longer(
+    cols = -iteration, 
+    names_to = "dim", 
+    values_to = "value"
+  ) %>% # 縦持ちに変換
+  ggplot(aes(x = iteration, y = value, color = dim)) + 
+    geom_line(alpha = 0.5) + 
+    labs(title = "Gibbs Sampling", 
+         subtitle = expression(Lambda))
 
 
-# gif画像で推移を確認 -------------------------------------------------------------
+### gif画像で分布の推移を確認 -----
 
 # 追加パッケージ
 library(gganimate)
 
 
 # 作図用のデータフレームを作成
-model_df <- tibble()
-sample_df <- tibble()
-for(i in 1:(MaxIter + 1)) {
+trace_model_df <- tibble()
+trace_cluster_df <- tibble()
+for(i in 1:MaxIter) {
+  # i回目の分布を計算
+  res_density <- 0
   for(k in 1:K) {
-    # 観測モデルを計算
-    tmp_model_df <- cbind(
-      point_df, 
-      density = mvnfast::dmvn(
-        as.matrix(point_df), mu = trace_mu_ikd[i, k, ], sigma = solve(trace_lambda_iddk[i, , , k])
-      ), 
-      cluster = as.factor(k), 
-      iteration = as.factor(i-1)
+    # クラスタkの確率密度を計算
+    tmp_density <- mvnfast::dmvn(
+      X = x_point_mat, 
+      mu = trace_mu_ikd[i, k, ], 
+      sigma = solve(trace_lambda_iddk[i, , , k])
     )
-    model_df <- rbind(model_df, tmp_model_df)
     
-    # 観測データのデータフレーム
-    if(i > 1) { # 初期値以外のとき
-      k_idx <- which(trace_s_in[i - 1, ] == k)
-      tmp_sample_df <- tibble(
-        x1 = x_nd[k_idx, 1], 
-        x2 = x_nd[k_idx, 2], 
-        cluster = as.factor(k), 
-        iteration = as.factor(i - 1)
-      )
-      sample_df <- rbind(sample_df, tmp_sample_df)
-    }
+    # 確率密度加重平均を計算
+    res_density <- res_density + tmp_density * pi_k[k]
   }
   
-  if(i == 1) { # 初期値のとき
-    tmp_sample_df <- tibble(
-      x1 = x_nd[, 1], 
-      x2 = x_nd[, 2], 
-      cluster = NA, 
-      iteration = as.factor(i - 1)
-    )
-    sample_df <- rbind(sample_df, tmp_sample_df)
-  }
+  # i回目の分布をデータフレームに格納
+  res_df <- tibble(
+    x_1 = x_point_mat[, 1], 
+    x_2 = x_point_mat[, 2], 
+    density = res_density, 
+    iteration = as.factor(i)
+  )
+  
+  # 結果を結合
+  trace_model_df <- rbind(trace_model_df, res_df)
+  
+  # 観測データとi回目のサンプルしたクラスタをデータフレームに格納
+  s_df <- tibble(
+    x_n1 = x_nd[, 1], 
+    x_n2 = x_nd[, 2], 
+    cluster = as.factor(trace_s_in[i, ]), 
+    iteration = as.factor(i)
+  )
+  
+  # 結果を結合
+  trace_cluster_df <- rbind(trace_cluster_df, s_df)
   
   # 動作確認
-  print(paste0(i - 1, ' (', round((i - 1) / MaxIter * 100, 1), '%)'))
+  print(paste0(i, ' (', round(i / MaxIter * 100, 1), '%)'))
 }
 
-# 近似事後分布を作図
-trace_graphe <- ggplot() + 
-  geom_contour(data = model_df, aes(x1, x2, z = density, color = cluster)) + # 近似事後分布
-  geom_contour(data = model_true_df, aes(x1, x2, z = density, color = cluster), 
-               linetype = "dotted", alpha = 0.6) + # 真の観測モデル
-  geom_point(data = sample_df, aes(x1, x2, color = cluster)) + # 観測データ
-  transition_manual(iteration) + # フレーム
-  labs(title = "Gibbs Sampling", 
-       subtitle = paste0('K=', K, ', N=', N, ', iter:{current_frame}'), 
+# 分布の推移を作図
+trace_graph <- ggplot() + 
+  geom_contour(data = model_df, aes(x = x_1, y = x_2, z = density, color = ..level..), 
+               alpha = 0.5, linetype = "dashed") + # 真の分布
+  geom_point(data = mu_df, aes(x = x_1, y = x_2), color = "red", shape = 4, size = 5) + # 真の平均
+  geom_contour(data = trace_model_df, aes(x = x_1, y = x_2, z = density, color = ..level..)) + # サンプルした分布
+  geom_point(data = trace_cluster_df, aes(x = x_n1, y = x_n2)) + # 観測データ
+  gganimate::transition_manual(iteration) + # フレーム
+  labs(title = "Gaussian Mixture Model:Gibbs Sampling", 
+       subtitle = paste0("iter:{current_frame}", ", N=", N, ", K=", K), 
        x = expression(x[1]), y = expression(x[2]))
 
 # gif画像を作成
-animate(trace_graphe, nframes = MaxIter + 1, fps = 10)
+gganimate::animate(trace_graph, nframes = MaxIter, fps = 10)
+
+
+# クラスタの推移を作図
+trace_graph <- ggplot() + 
+  geom_contour(data = model_df, aes(x = x_1, y = x_2, z = density), 
+               color = "red", alpha = 0.5, linetype = "dashed") + # 真の分布
+  geom_point(data = mu_df, aes(x = x_1, y = x_2), color = "red", shape = 4, size = 5) + # 真の平均
+  geom_contour_filled(data = trace_model_df, aes(x = x_1, y = x_2, z = density), alpha = 0.6) + # サンプルした分布
+  geom_point(data = trace_cluster_df, aes(x = x_n1, y = x_n2, color = cluster)) + # サンプル↓クラスタ
+  gganimate::transition_manual(iteration) + # フレーム
+  labs(title = "Gaussian Mixture Model:Gibbs Sampling", 
+       subtitle = paste0("iter:{current_frame}", ", N=", N, ", K=", K), 
+       x = expression(x[1]), y = expression(x[2]))
+
+# gif画像を作成
+gganimate::animate(trace_graph, nframes = MaxIter, fps = 10)
+
 
