@@ -1,316 +1,408 @@
-
 # 4.3.3 ポアソン混合モデルにおける崩壊型ギブスサンプリング -------------------------------------------------
 
-# 利用パッケージ
+# 4.3.3項で利用するパッケージ
 library(tidyverse)
 library(gganimate)
 
 
-# 真の観測モデルの設定 ----------------------------------------------------------------
-
-# (観測)データ数を指定
-N <- 100
+### 観測モデル(ポアソン混合分布)の設定 -----
 
 # 真のパラメータを指定
-lambda_truth <- c(5, 25)
-pi_truth <- c(0.3, 0.7)
+lambda_truth_k <- c(5, 25, 50)
 
-# クラスタ数
-K <- length(lambda_truth)
+# 真の混合比率を指定
+pi_truth_k <- c(0.35, 0.25, 0.4)
 
-# クラスタ(潜在変数)を生成
-s_nk <- rmultinom(n =  N, size = 1, prob = pi_truth) %>% 
+# クラスタ数を取得
+K <- length(lambda_truth_k)
+
+
+# 作図用のxの点を作成
+x_vec <- seq(0, 2 * max(lambda_truth_k))
+
+# 観測モデルを計算
+model_prob <- 0
+for(k in 1:K) {
+  # クラスタkの分布の確率を計算
+  tmp_prob <- dpois(x = x_vec, lambda_truth_k[k])
+  
+  # K個の分布の加重平均を計算
+  model_prob <- model_prob + tmp_prob * pi_truth_k[k]
+}
+
+# 観測モデルをデータフレームに格納
+model_df <- tibble(
+  x = x_vec, 
+  prob = model_prob
+)
+
+# 観測モデルを作図
+ggplot(model_df, aes(x = x, y = prob)) + 
+  geom_bar(stat = "identity", position = "dodge", 
+           fill = "purple", color = "purple") + # 真の分布
+  labs(title = "Poisson Mixture Model", 
+       subtitle = paste0(
+         "lambda=(", paste0(lambda_truth_k, collapse = ", "), ")"
+       ))
+
+
+### 観測データの生成 -----
+
+# (観測)データ数を指定
+N <- 250
+
+# クラスタを生成
+s_truth_nk <- rmultinom(n =  N, size = 1, prob = pi_truth_k) %>% 
   t()
 
-# (観測)データXを生成
-x_n <- rpois(n = N, lambda = apply(lambda_truth^t(s_nk), 2, prod))
+# クラスタ番号を抽出
+s_truth_n <- which(t(s_truth_nk) == 1, arr.ind = TRUE) %>% 
+  .[, "row"]
+
+# (観測)データを生成
+x_n <- rpois(n = N, lambda = apply(lambda_truth_k^t(s_truth_nk), 2, prod))
+x_n <- rpois(n = N, lambda = lambda_truth_k[s_truth_n])
 
 # 観測データを確認
 summary(x_n)
-tibble(x = x_n) %>% 
-  ggplot(aes(x = x)) + 
-    geom_bar(fill = "#56256E") + 
-    labs(title = "Histogram")
 
 
-# パラメータの設定 ----------------------------------------------------------------
+# 観測データをデータフレームに格納
+x_df <- tibble(
+  x_n = x_n, 
+  cluster = as.factor(s_truth_n)
+)
 
-# 試行回数を指定
-MaxIter <- 50
+# 観測データのヒストグラムを作成
+ggplot() + 
+  geom_histogram(data = x_df, aes(x = x_n, y = ..density..), binwidth = 1) + # 観測データ
+  geom_bar(data = model_df, aes(x = x, y = prob), stat = "identity", position = "dodge", 
+           alpha = 0, color = "red", linetype = "dashed") + # 真の分布
+  labs(title = "Poisson Mixture Model", 
+       subtitle = paste0("N=", N, ", lambda=(", paste0(lambda_truth_k, collapse = ", "), ")"), 
+       x = "x")
 
-# ハイパーパラメータa,bを指定
+# クラスタのヒストグラムを作成
+ggplot() + 
+  geom_histogram(data = x_df, aes(x = x_n, fill = cluster), binwidth = 1, 
+                 position = "identity", alpha = 0.5) + # クラスタ
+  labs(title = "Poisson Mixture Model", 
+       subtitle = paste0("N=", N, 
+                         ", lambda=(", paste0(lambda_truth_k, collapse = ", "), ")", 
+                         ", pi=(", paste0(pi_truth_k, collapse = ", "), ")"), 
+       x = "x")
+
+
+### 事前分布(ガンマ分布とディリクレ分布)の設定 -----
+
+# lambdaの事前分布のパラメータを指定
 a <- 1
 b <- 1
+
+# piの事前分布のパラメータを指定
 alpha_k <- rep(2, K)
 
-# 潜在変数Sの初期値をランダムに設定
-s_nk <- rmultinom(n = N, size = 1, prob = rep(1, K)) %>% 
+
+### 初期値の設定 -----
+
+# 潜在変数の初期値をランダムに生成
+s_nk <- rmultinom(n = N, size = 1, prob = alpha_k / sum(alpha_k)) %>% 
   t()
 
-# Xに関する統計量を計算
-hat_a_k <- apply(s_nk * x_n, 2, sum) + a
-hat_b_k <- apply(s_nk, 2, sum) + b
-hat_alpha_k <- apply(s_nk, 2, sum) + alpha_k
+# lambdaの事後分布のパラメータを計算:式(4.24)
+a_hat_k <- colSums(s_nk * x_n) + a
+b_hat_k <- colSums(s_nk) + b
+
+# piの事後分布のパラメータを計算:式(4.45)
+alpha_hat_k <- colSums(s_nk) + alpha_k
 
 
-# 崩壊型ギブスサンプリング ------------------------------------------------------------
-
-# 受け皿を用意
-eta_k.n <- rep(0, K)
-hat_r_k <- rep(0, K)
-hat_p_k <- rep(0, K)
-
-
-# ハイパーパラメータの推定値の推移の確認用
-trace_a <- matrix(0, nrow = MaxIter + 1, ncol = K)
-trace_b <- matrix(0, nrow = MaxIter + 1, ncol = K)
-trace_alpha <- matrix(0, nrow = MaxIter + 1, ncol = K)
-# 初期値を代入
-trace_a[1, ] <- hat_a_k.n
-trace_b[1, ] <- hat_b_k.n
-trace_alpha[1, ] <- hat_alpha_k.n
-
-for(i in 1:MaxIter) {
-   
-  # 初期化
-  new_a_k <- rep(0, K)
-  new_b_k <- rep(0, K)
-  new_alpha_k <- rep(0, K)
+# 初期値による混合分布を計算
+init_prob <- 0
+for(k in 1:K) {
+  # クラスタkの分布の確率を計算
+  tmp_prob <- dpois(x = x_vec, a_hat_k[k] / b_hat_k[k])
   
+  #　K個の分布の加重平均を計算
+  init_prob <- init_prob + tmp_prob * alpha_hat_k[k] / sum(alpha_hat_k)
+}
+
+# 初期値による分布をデータフレームに格納
+init_df <- tibble(
+  x = x_vec, 
+  prob = init_prob
+)
+
+# 初期値による分布を作図
+ggplot(init_df, aes(x = x, y = prob)) + 
+  geom_bar(stat = "identity") + # 初期値による分布
+  labs(title = "Poisson Mixture Model", 
+       subtitle = paste0("iter:", 0, 
+                         ", E[lambda]=(", paste0(round(a_hat_k / b_hat_k, 2), collapse = ", "), ")"))
+
+
+### 推論処理 -----
+
+# 試行回数を指定
+MaxIter <- 100
+
+# 推移の確認用の受け皿を初期化
+trace_s_in <- matrix(0, nrow = MaxIter + 1, ncol = N)
+trace_a_ik <- matrix(0, nrow = MaxIter + 1, ncol = K)
+trace_b_ik <- matrix(0, nrow = MaxIter + 1, ncol = K)
+trace_alpha_ik <- matrix(0, nrow = MaxIter + 1, ncol = K)
+
+# 初期値を記録
+trace_s_in[1, ] <- which(t(s_nk) == 1, arr.ind = TRUE) %>% 
+  .[, "row"]
+trace_a_ik[1, ] <- a_hat_k
+trace_b_ik[1, ] <- b_hat_k
+trace_alpha_ik[1, ] <- alpha_hat_k
+
+# 崩壊型ギブスサンプリング
+for(i in 1:MaxIter) {
   for(n in 1:N) {
     
-    # 更新した統計量を移す
-    hat_a_k.n <- hat_a_k
-    hat_b_k.n <- hat_b_k
-    hat_alpha_k.n <- hat_alpha_k
-
+    # n番目のデータの現在のクラスタ番号を取得
+    k <- which(s_nk[n, ] == 1)
     
-    # x_nに関する統計量を除去:式(4.82),(4.83)
-    hat_a_k.n <- hat_a_k.n - s_nk[n, ] * x_n[n]
-    hat_b_k.n <- hat_b_k.n - s_nk[n, ]
-    hat_alpha_k.n <- hat_alpha_k.n - s_nk[n, ]
+    # n番目のデータに関する統計量を除算
+    a_hat_k[k] <- a_hat_k[k] - x_n[n]
+    b_hat_k[k] <- b_hat_k[k] - 1
+    alpha_hat_k[k] <- alpha_hat_k[k] - 1
     
-    for(k in 1:K) {
-      
-      # ハイパーパラメータr_hat,p_hatを計算:式(4.80)
-      hat_r_k[k] <- hat_a_k.n[k]
-      hat_p_k[k] <- 1 / (hat_b_k.n[k] + 1)
-      
-      # :式(4.81)
-      C_NB <- lgamma(x_n[n] + hat_r_k[k]) - lgamma(x_n[n] + 1) - lgamma(hat_r_k[k]) # 正規化項(対数)
-      p_x_n <- exp(C_NB + hat_r_k[k] * log(1 - hat_p_k[k]) + x_n[n] * log(hat_p_k[k]))
-    }
+    # 負の二項分布(4.81)のパラメータを計算
+    r_hat_k <- a_hat_k
+    p_hat_k <- 1 / (b_hat_k + 1)
     
-    # パラメータeta_nを計算:式(4.75)
-    eta_k.n <- hat_alpha_k.n / sum(hat_alpha_k.n)
+    # 負の二項分布の確率を計算:式(4.81)
+    prob_nb_k <- dnbinom(x = x_n[n], size = r_hat_k, prob = 1 - p_hat_k)
     
-    # 潜在変数s_nをサンプル:式(4.74)
-    s_nk[n, ] <- rmultinom(n = 1, size = 1, prob = eta_nk[n, ]) %>% 
+    # カテゴリ分布(4.74)のパラメータを計算:式(4.75)
+    eta_k <- alpha_hat_k / sum(alpha_hat_k)
+    
+    # n番目のクラスタのサンプリング確率を計算:式(4.66)
+    prob_s_k <- (prob_nb_k + 1e-7) * eta_k
+    prob_s_k <- prob_s_k / sum(prob_s_k) # 正規化
+    
+    # n番目のクラスタをサンプル:式(4.74)
+    s_nk[n, ] <- rmultinom(n = 1, size = 1, prob = prob_s_k) %>% 
       as.vector()
     
-    # x_nに関する統計量を追加:式(4.82),(4.83)
-    new_a_k <- hat_a_k + s_nk[n, ] * x_n[n]
-    new_b_k <- hat_b_k + s_nk[n, ]
-    new_alpha_k <- hat_alpha_k + s_nk[n, ]
+    # n番目のデータの新しいクラスタを取得
+    k <- which(s_nk[n, ] == 1)
+    
+    # n番目のデータに関する統計量を加算:式(4.82-4.83)
+    a_hat_k[k] <- a_hat_k[k] + x_n[n]
+    b_hat_k[k] <- b_hat_k[k] + 1
+    alpha_hat_k[k] <- alpha_hat_k[k] + 1
   }
   
-  #
-  # 更新
-  hat_a_k <- new_a_k
-  hat_b_k <- new_b_k
-  hat_alpha_k <- new_alpha_k
+  # i回目の結果を記録
+  trace_s_in[i + 1, ] <- which(t(s_nk) == 1, arr.ind = TRUE) %>% 
+    .[, "row"] %>% 
+    as.vector()
+  trace_a_ik[i + 1, ] <- a_hat_k
+  trace_b_ik[i + 1, ] <- b_hat_k
+  trace_alpha_ik[i + 1, ] <- alpha_hat_k
   
-  # 推移の確認用に推定結果を保存
-  trace_a[i + 1, ] <- hat_a_k
-  trace_b[i + 1, ] <- hat_b_k
-  trace_alpha[i + 1, ] <- hat_alpha_k
+  # 動作確認
+  print(paste0(i, ' (', round(i / MaxIter * 100, 1), '%)'))
 }
 
 
-# 結果の確認 -------------------------------------------------------------------
+### 結果の確認 -----
 
-## lambdaの近似事後分布
-# 作図用のデータフレームを作成
-lambda_df <- tibble()
+# 最後の分布を計算
+res_prob <- 0
 for(k in 1:K) {
-  # データフレームに変換
-  tmp_lambda_df <- tibble(
-    lambda = seq(0, max(x_n), by = 0.01), 
-    density = dgamma(lambda, shape = hat_a_k.n[k], rate = hat_b_k.n[k]), 
-    cluster = as.factor(k)
-  )
-  # 結合
-  lambda_df <- rbind(lambda_df, tmp_lambda_df)
+  # クラスタkの分布の確率を計算
+  tmp_prob <- dpois(x = x_vec, lambda = a_hat_k[k] / b_hat_k[k])
+  
+  # K個の分布の加重平均を計算
+  res_prob <- res_prob + tmp_prob * alpha_hat_k[k] / sum(alpha_hat_k)
 }
 
-# 作図
-ggplot(lambda_df, aes(lambda, density, color = cluster)) + 
-  geom_line() + # 折れ線グラフ
-  scale_color_manual(values = c("#00A968", "orange")) + # グラフの色(不必要)
-  geom_vline(xintercept = lambda_truth, color = "pink", linetype = "dashed") + # 垂直線
-  labs(title = "Poisson Mixture Model:Variational Inference", 
-       subtitle = paste0("a_hat=(", paste0(round(hat_a_k.n, 1), collapse = ", "), 
-                         "), b_hat=(", paste0(round(hat_b_k.n, 1), collapse = ", "), ")")) # ラベル
-
-
-## piの近似事後分布(K=2のときのみ可能)
-# 作図用のデータフレームを作成
-pi_df <- tibble()
-for(k in 1:K) {
-  # データフレームに変換
-  tmp_pi_df <- tibble(
-    pi = seq(0, 1, by = 0.01), 
-    density = dbeta(pi, shape1 = hat_alpha_k.n[k], shape2 = hat_alpha_k.n[2 / k]), 
-    cluster = as.factor(k)
-  )
-  # 結合
-  pi_df <- rbind(pi_df, tmp_pi_df)
-}
-
-# 作図
-ggplot(pi_df, aes(pi, density, color = cluster)) + 
-  geom_line() + # 折れ線グラフ
-  scale_color_manual(values = c("#00A968", "orange")) + # グラフの色(不必要)
-  geom_vline(xintercept = pi_truth, color = "pink", linetype = "dashed") + # 垂直線
-  labs(title = "Poisson Mixture Model:Variational Inference", 
-       subtitle = paste0("alpha_hat=(", paste0(round(hat_alpha_k.n, 1), collapse = ", "), ")")) # ラベル
-
-
-
-# パラメータの推移の確認 -------------------------------------------------------------
-
-## lambdaの近似事後分布
-# 作図用のデータフレームを作成
-trace_lambda_long <- tibble()
-for(i in 1:(MaxIter + 1)) {
-  for(k in 1:K) {
-    # データフレームに変換
-    tmp_lambda_df <- tibble(
-      lambda = seq(0, max(x_n), by = 0.01), 
-      density = dgamma(lambda, shape = trace_a[i, k], rate = trace_b[i, k]), 
-      cluster = as.factor(k), 
-      Iteration = i - 1
-    )
-    # 結合
-    trace_lambda_long <- rbind(trace_lambda_long, tmp_lambda_df)
-  }
-}
-
-# 作図
-graph_lambda <- ggplot(trace_lambda_long, aes(lambda, density, color = cluster)) + 
-  geom_line() + # 折れ線グラフ
-  scale_color_manual(values = c("#00A968", "orange")) + # グラフの色(不必要)
-  geom_vline(xintercept = lambda_truth, color = "pink", linetype = "dashed") + # 垂直線
-  transition_manual(Iteration) + # フレーム
-  labs(title = "Poisson Mixture Model:Variational Inference", 
-       subtitle = "i={current_frame}") # ラベル
-
-# gif画像を作成
-animate(graph_lambda, nframes = MaxIter + 1, fps = 5)
-
-
-## piの近似事後分布(K=2のときのみ可)
-# 作図用のデータフレームを作成
-trace_pi_long <- tibble()
-for(i in 1:(MaxIter + 1)) {
-  for(k in 1:K) {
-    # データフレームに変換
-    tmp_pi_df <- tibble(
-      pi = seq(0, 1, by = 0.01), 
-      density = dbeta(pi, shape1 = trace_alpha[i, k], shape2 = trace_alpha[i, 2 / k]), 
-      cluster = as.factor(k), 
-      Iteration = i - 1
-    )
-    # 結合
-    trace_pi_long <- rbind(trace_pi_long, tmp_pi_df)
-  }
-}
-
-# 作図
-graph_pi <- ggplot(trace_pi_long, aes(pi, density, color = cluster)) + 
-  geom_line() + # 折れ線グラフ
-  scale_color_manual(values = c("#00A968", "orange")) + # グラフの色(不必要)
-  geom_vline(xintercept = pi_truth, color = "pink", linetype = "dashed") + # 垂直線
-  transition_manual(Iteration) + # フレーム
-  labs(title = "Poisson Mixture Model:Variational Inference", 
-       subtitle = "i={current_frame}") # ラベル
-
-# gif画像を作成
-animate(graph_pi, nframes = MaxIter + 1, fps = 5)
-
-
-
-# ハイパーパラメータの推移の確認 ---------------------------------------------------------
-
-## lambdaのパラメータa
-# データフレームに変換
-trace_a_wide <- cbind(
-  as.data.frame(trace_a), 
-  Iteration = 1:(MaxIter + 1)
+# 最後の分布をデータフレームに格納
+res_df <- tibble(
+  x = x_vec, 
+  prob = res_prob
 )
 
-# long型に変換
-trace_a_long <- pivot_longer(
-  trace_a_wide, 
-  cols = -Iteration, 
-  names_to = "cluster", 
-  names_prefix = "V", 
-  names_ptypes = list(cluster = factor()), 
-  values_to = "value"
+# 最後の分布を作図
+ggplot() + 
+  geom_bar(data = res_df, aes(x = x, y = prob), stat = "identity", 
+           fill = "purple") + # 最後の分布
+  geom_bar(data = model_df, aes(x = x, y = prob), stat = "identity", 
+           alpha = 0, color = "red", linetype = "dashed") + # 真の分布
+  labs(title = "Poisson Mixture Model:Gibbs Sampling", 
+       subtitle = paste0("iter:", MaxIter, 
+                         ", E[lambda]=(", paste0(round(a_hat_k / b_hat_k, 2), collapse = ", "), ")"))
+
+
+# 最後のクラスタをデータフレームに格納
+s_df <- tibble(
+  x_n = x_n, 
+  cluster = which(t(s_nk) == 1, arr.ind = TRUE) %>% 
+    .[, "row"] %>% 
+    as.factor()
 )
 
-# 作図
-ggplot(trace_a_long, aes(Iteration, value, color = cluster)) + 
+# 最後のクラスタのヒストグラムを作成
+ggplot() + 
+  geom_histogram(data = s_df, aes(x = x_n, fill = cluster), binwidth = 1, position = "identity", 
+                 alpha = 0.5) + # 最後のクラスタ
+  geom_histogram(data = x_df, aes(x = x_n, color = cluster), binwidth = 1, position = "identity",
+                 alpha = 0, linetype = "dashed") + # 真のクラスタ
+  labs(title = "Poisson Mixture Model:Gibbs Sampling", 
+       subtitle = paste0("iter:", MaxIter, ", N=", N, 
+                         ", E[lambda]=(", paste0(round(a_hat_k / b_hat_k, 2), collapse = ", "), ")", 
+                         ", E[pi]=(", paste0(round(alpha_hat_k / sum(alpha_hat_k), 2), collapse = ", "), ")"), 
+       x = "x")
+
+
+### 超パラメータの推移の確認 -----
+
+# aの推移をデータフレームに格納
+trace_a_df <- dplyr::as_tibble(trace_a_ik) %>% # データフレームに変換
+  cbind(iteration = 0:MaxIter) %>% # 試行回数の列を追加
+  tidyr::pivot_longer(
+    cols = -iteration, # 変換しない列
+    names_to = "cluster", # 現列名を格納する列名
+    names_prefix = "V", # 現列名の頭から取り除く文字列
+    names_ptypes = list(cluster = factor()), # 現列名を値とする際の型
+    values_to = "value" # 現セルを格納する列名
+  ) # 縦持ちに変換
+
+# aの推移を作図
+ggplot(trace_a_df, aes(x = iteration, y = value, color = cluster)) + 
   geom_line() + 
-  labs(title = "Poisson Mixture Model:Variational Inference", 
-       subtitle = expression(hat(a)))
+  labs(title = "Variational Inferance", 
+       subtitle = expression(hat(bold(a))))
 
+# bの推移をデータフレームに格納
+trace_a_df <- dplyr::as_tibble(trace_b_ik) %>% # データフレームに変換
+  cbind(iteration = 0:MaxIter) %>% # 試行回数の列を追加
+  tidyr::pivot_longer(
+    cols = -iteration, # 変換しない列
+    names_to = "cluster", # 現列名を格納する列名
+    names_prefix = "V", # 現列名の頭から取り除く文字列
+    names_ptypes = list(cluster = factor()), # 現列名を値とする際の型
+    values_to = "value" # 現セルを格納する列名
+  ) # 縦持ちに変換
 
-## lambdaのパラメータb
-# データフレームに変換
-trace_b_wide <- cbind(
-  as.data.frame(trace_a), 
-  Iteration = 1:(MaxIter + 1)
-)
-
-# long型に変換
-trace_b_long <- pivot_longer(
-  trace_b_wide, 
-  cols = -Iteration, 
-  names_to = "cluster", 
-  names_prefix = "V", 
-  names_ptypes = list(cluster = factor()), 
-  values_to = "value"
-)
-
-# 作図
-ggplot(trace_b_long, aes(Iteration, value, color = cluster)) + 
+# bの推移を作図
+ggplot(trace_a_df, aes(x = iteration, y = value, color = cluster)) + 
   geom_line() + 
-  labs(title = "Poisson Mixture Model:Variational Inference", 
-       subtitle = expression(hat(b)))
+  labs(title = "Variational Inferance", 
+       subtitle = expression(hat(bold(b))))
 
+# alphaの推移を作図
+trace_alpha_df <- dplyr::as_tibble(trace_alpha_ik) %>% # データフレームに変換
+  cbind(iteration = 0:MaxIter) %>% # 試行回数の列を追加
+  tidyr::pivot_longer(
+    cols = -iteration, # 変換しない列
+    names_to = "cluster", # 現列名を格納する列名
+    names_prefix = "V", # 現列名の頭から取り除く文字列
+    names_ptypes = list(cluster = factor()), # 現列名を値とする際の型
+    values_to = "value" # 現セルを格納する列名
+  ) # 縦持ちに変換
 
-## piのパラメータ
-# データフレームに変換
-trace_alpha_wide <- cbind(
-  as.data.frame(trace_alpha), 
-  Iteration = 1:(MaxIter + 1)
-)
-
-# long型に変換
-trace_alpha_long <- pivot_longer(
-  trace_alpha_wide, 
-  cols = -Iteration, 
-  names_to = "cluster", 
-  names_prefix = "V", 
-  names_ptypes = list(cluster = factor()), 
-  values_to = "value"
-)
-
-# 作図
-ggplot(trace_alpha_long, aes(Iteration, value, color = cluster)) + 
+# alphaの推移を作図
+ggplot(trace_alpha_df, aes(x = iteration, y = value, color = cluster)) + 
   geom_line() + 
-  labs(title = "Poisson Mixture Model:Variational Inference", 
+  labs(title = "Variational Inferance", 
        subtitle = expression(hat(alpha)))
+
+
+### 分布の推移の確認 -----
+
+# 作図用のデータフレームを作成
+trace_model_df <- tibble()
+trace_cluster_df <- tibble()
+for(i in 1:(MaxIter + 1)) {
+  # i回目の分布を計算
+  res_prob <- 0
+  for(k in 1:K) {
+    # クラスタkの分布の確率を計算
+    tmp_prob <- dpois(x = x_vec, lambda = trace_a_ik[i, k] / trace_b_ik[i, k])
+    
+    # K個の分布の加重平均を計算
+    res_prob <- res_prob + tmp_prob * trace_alpha_ik[i, k] / sum(trace_alpha_ik[i, ])
+  }
+  
+  # i回目の分布をデータフレームに格納
+  res_df <- tibble(
+    x = x_vec, 
+    prob = res_prob, 
+    label = paste0(
+      "iter:", i - 1, ", N=", N, 
+      ", E[lambda]=(", paste0(round(trace_a_ik[i, ] / trace_b_ik[i, ], 2), collapse = ", "), ")"
+    ) %>% 
+      as.factor()
+  )
+  
+  # 結果を結合
+  trace_model_df <- rbind(trace_model_df, res_df)
+  
+  # i回目のクラスタをデータフレームに格納
+  s_df <- tibble(
+    x_n = x_n, 
+    cluster = as.factor(trace_s_in[i, ]), 
+    label = paste0(
+      "iter=", i - 1, ", N=", N, 
+      ", E[lambda]=(", paste0(round(trace_a_ik[i, ] / trace_b_ik[i, ], 2), collapse = ", "), ")", 
+      ", E[pi]=(", paste0(round(trace_alpha_ik[i, ] / sum(trace_alpha_ik[i, ]), 2), collapse = ", "), ")"
+    ) %>% 
+      as.factor()
+  )
+  
+  # 結果を結合
+  trace_cluster_df <- rbind(trace_cluster_df, s_df)
+}
+
+# アニメーション用に複製
+rep_model_df <- tibble(
+  x = rep(model_df[["x"]], times = MaxIter + 1), 
+  prob = rep(model_df[["prob"]], times = MaxIter + 1), 
+  label = trace_model_df[["label"]]
+)
+
+# 分布の推移を作図
+trace_graph <- ggplot() + 
+  geom_bar(data = trace_model_df, aes(x = x, y = prob), stat = "identity", 
+           fill = "purple") + # 推定した分布
+  geom_bar(data = rep_model_df, aes(x = x, y = prob), stat = "identity", 
+           alpha = 0, color = "red", linetype = "dashed") + # 真の分布
+  gganimate::transition_manual(label) + # フレーム
+  labs(title = "Poisson Mixture Model:Gibbs Sampling", 
+       subtitle = "{current_frame}")
+
+# gif画像を作成
+gganimate::animate(trace_graph, nframes = MaxIter + 1, fps = 10)
+
+
+# アニメーション用に複製
+rep_x_df <- tibble(
+  x_n = rep(x_n, times = MaxIter + 1), 
+  cluster = rep(as.factor(s_truth_n), times = MaxIter + 1), 
+  label = trace_cluster_df[["label"]]
+)
+
+# クラスタの推移を作図
+trace_graph <- ggplot() + 
+  geom_histogram(data = trace_cluster_df, aes(x = x_n, fill = cluster), 
+                 binwidth = 1, position = "identity",
+                 alpha = 0.5) + # 最後のクラスタ
+  geom_histogram(data = rep_x_df, aes(x = x_n, color = cluster), 
+                 binwidth = 1, position = "identity",
+                 alpha = 0, linetype = "dashed") + # 真のクラスタ
+  gganimate::transition_manual(label) + # フレーム
+  labs(title = "Poisson Mixture Model:Gibbs Sampling", 
+       subtitle = "{current_frame}", 
+       x = "x")
+
+# gif画像を作成
+gganimate::animate(trace_graph, nframes = MaxIter + 1, fps = 10)
 
 
