@@ -1,133 +1,266 @@
-# ch4.4.2 ガウス混合モデルにおけるギブスサンプリング
+# 4.4.2 ガウス混合モデルにおける推論：ギブスサンプリング
 
 #%%
 
-# 利用ライブラリ
+# 4.4.2項で利用するライブラリ
 import numpy as np
-from scipy.stats import multivariate_normal, wishart, dirichlet
+from scipy.stats import multivariate_normal, wishart, dirichlet # 多次元ガウス分布, ウィシャート分布, ディリクレ分布
 import matplotlib.pyplot as plt
 
 #%%
 
-# モデルの設定
+## 観測モデルの設定
 
-#%%
-
-# 真の観測モデルのパラメータを指定
+# 次元数を設定:(固定)
 D = 2
+
+# クラスタ数を指定
 K = 3
-mu_true_kd = np.array(
-    [[0.0, 4.0], 
-     [-5.0, -5.0], 
-     [5.0, -2.5]]
+
+# K個の真の平均を設定
+mu_truth_kd = np.array(
+    [[5.0, 35.0], 
+     [-20.0, -10.0], 
+     [30.0, -20.0]]
 )
-sigma2_true_kdd = np.array(
-    [[[8.0, 0.0], [0.0, 8.0]], 
-     [[4.0, -2.5], [-2.5, 4.0]], 
-     [[6.5, 4.0], [4.0, 6.5]]]
+
+# K個の真の分散共分散行列を指定
+sigma2_truth_kdd = np.array(
+    [[[250.0, 65.0], [65.0, 270.0]], 
+     [[125.0, -45.0], [-45.0, 175.0]], 
+     [[210.0, -15.0], [-15.0, 250.0]]]
 )
-#lambda_true_kdd = np.linalg.inv(sigma2_true_kdd)
+#lambda_truth_kdd = np.linalg.inv(sigma2_true_kdd)
 
 # 真の混合比率を指定
-pi_true_k = np.array([0.5, 0.2, 0.3])
+pi_truth_k = np.array([0.45, 0.25, 0.3])
 
 #%%
 
-# 各データの真のクラスタを生成
-N = 250
-s_true_nk = np.random.multinomial(n=1, pvals=pi_true_k, size=N)
-_, s_true_n = np.where(s_true_nk == 1)
+# 作図用のx軸の値を作成
+x_1_line = np.linspace(
+    np.min(mu_truth_kd[:, 0] - 3 * np.sqrt(sigma2_truth_kdd[:, 0, 0])), 
+    np.max(mu_truth_kd[:, 0] + 3 * np.sqrt(sigma2_truth_kdd[:, 0, 0])), 
+    num=300
+)
 
-# 観測データを生成
-x_nd = np.array([
-    np.random.multivariate_normal(
-        mean=mu_true_kd[k], cov=sigma2_true_kdd[k], size=1
-    ).flatten() for k in s_true_n
-])
-
-#%%
+# 作図用のy軸の値を作成
+x_2_line = np.linspace(
+    np.min(mu_truth_kd[:, 1] - 3 * np.sqrt(sigma2_truth_kdd[:, 1, 1])), 
+    np.max(mu_truth_kd[:, 1] + 3 * np.sqrt(sigma2_truth_kdd[:, 1, 1])), 
+    num=300
+)
 
 # 作図用の格子状の点を作成
-X_line, Y_line = np.meshgrid(np.arange(-10.0, 10.0, 0.2), np.arange(-10.0, 10.0, 0.2))
-x_line = X_line.flatten()
-y_line = Y_line.flatten()
+x_1_grid, x_2_grid = np.meshgrid(x_1_line, x_2_line)
+
+# 作図用のxの点を作成
+x_point = np.stack([x_1_grid.flatten(), x_2_grid.flatten()], axis=1)
+x_dim = x_1_grid.shape
+print(x_dim)
+
 
 # 観測モデルを計算
-z_kline = np.empty((K, len(x_line)))
+true_model = 0
 for k in range(K):
-    tmp_z_line = [
-        multivariate_normal.pdf(
-            x=(x, y), mean=mu_true_kd[k], cov=sigma2_true_kdd[k]
-        ) for x, y in zip(x_line, y_line)
-    ]
-    z_kline[k] = tmp_z_line.copy()
-Z_true_kline = z_kline.reshape((K, *X_line.shape))
+    # クラスタkの確率密度を計算
+    tmp_density = multivariate_normal.pdf(
+        x=x_point, mean=mu_truth_kd[k], cov=sigma2_truth_kdd[k]
+    )
+    
+    # K個の確率密度の加重平均を計算
+    true_model += tmp_density * pi_truth_k[k]
 
 #%%
 
-# 観測データの散布図を作成
-fig = plt.figure(figsize=(10, 10))
-for k in range(K):
-    plt.contour(X_line, Y_line, Z_true_kline[k]) # 真の観測モデル
-    k_idx = np.where(s_true_n == k)
-    plt.scatter(x_nd[k_idx, 0], x_nd[k_idx, 1], label='cluster'+str(k+1)) # 真の観測データ
-plt.scatter(mu_true_kd[:, 0], mu_true_kd[:, 1], marker='+', s=100) # 真の平均
+# 観測モデルを作図
+plt.figure(figsize=(12, 9))
+plt.contour(x_1_grid, x_2_grid, true_model.reshape(x_dim)) # 真の分布
 plt.suptitle('Gaussian Mixture Model', fontsize=20)
-plt.title('K=' + str(K) + ', N=' + str(N), loc='left', fontsize=20)
+plt.title('K=' + str(K), loc='left')
 plt.xlabel('$x_1$')
 plt.ylabel('$x_2$')
+plt.colorbar()
 plt.show()
 
 #%%
 
-# 観測モデルのパラメータの初期値を指定
-mu_kd = np.zeros((K, D))
-lambda_kdd = np.array([
-    np.linalg.inv(np.identity(D) * 100) for _ in range(K)
+# (観測)データ数を指定
+N = 250
+
+# クラスタを生成
+s_truth_nk = np.random.multinomial(n=1, pvals=pi_truth_k, size=N)
+print(s_truth_nk[:5])
+
+# クラスタ番号を抽出
+_, s_truth_n = np.where(s_truth_nk == 1)
+print(s_truth_n[:5])
+
+# (観測)データを生成
+x_nd = np.array([
+    np.random.multivariate_normal(
+        mean=mu_truth_kd[k], cov=sigma2_truth_kdd[k], size=1
+    ).flatten() for k in s_truth_n
 ])
+print(x_nd[:5])
 
-# 混合比率の初期値を指定
-pi_k = np.random.choice(np.arange(0.0, 1.0, 0.01), size=K)
-pi_k /= np.sum(pi_k)
+#%%
 
-# 事前分布のパラメータを指定
+# 観測データの散布図を作成
+plt.figure(figsize=(12, 9))
+plt.contour(x_1_grid, x_2_grid, true_model.reshape(x_dim), linestyle='--') # 真の分布
+for k in range(K):
+    k_idx, = np.where(s_truth_n == k)
+    plt.scatter(x=x_nd[k_idx, 0], y=x_nd[k_idx, 1], label='cluster:' + str(k + 1)) # 観測データ
+plt.suptitle('Gaussian Mixture Model', fontsize=20)
+plt.title('$N=' + str(N) + ', K=' + str(K) + 
+          ', \pi=[' + ', '.join([str(pi) for pi in pi_truth_k]) + ']$', loc='left')
+plt.xlabel('$x_1$')
+plt.ylabel('$x_2$')
+plt.colorbar()
+plt.show()
+
+#%%
+
+## 事前分布(ガウス・ウィシャート分布)の設定
+
+# muの事前分布のパラメータを指定
 beta = 1
 m_d = np.array([0.0, 0.0])
+
+# lambdaの事前分布のパラメータを指定
 nu = D
-w_dd = np.identity(D) * 10
+w_dd = np.identity(D) * 0.0005
+print(np.sqrt(np.linalg.inv(beta * nu * w_dd))) # (疑似)相関行列
+
+# piの事前分布のパラメータを指定
 alpha_k = np.repeat(1, K)
 
+
+# muの事前分布の標準偏差を計算
+sigma_mu_d = np.sqrt(
+    np.linalg.inv(beta * nu * w_dd)
+).diagonal()
+
+# 作図用のx軸の値
+mu_0_line = np.linspace(
+    np.min(m_d[0] - 3 * sigma_mu_d[0]), 
+    np.max(m_d[0] + 3 * sigma_mu_d[0]), 
+    num=300
+)
+
+# 作図用のy軸の値
+mu_1_line = np.linspace(
+    np.min(m_d[1] - 3 * sigma_mu_d[1]), 
+    np.max(m_d[1] + 3 * sigma_mu_d[1]), 
+    num=300
+)
+
+# 作図用の格子状の点を作成
+mu_0_grid, mu_1_grid = np.meshgrid(mu_0_line, mu_1_line)
+
+# 作図用のmuの点を作成
+mu_point = np.stack([mu_0_grid.flatten(), mu_1_grid.flatten()], axis=1)
+mu_dim = mu_0_grid.shape
+print(mu_dim)
+
+#%%
+
+# muの事前分布を計算
+prior_density = multivariate_normal.pdf(
+    x=mu_point, mean=m_d, cov=np.linalg.inv(beta * nu * w_dd)
+)
+
+# muの事前分布をを作図
+plt.figure(figsize=(12, 9))
+plt.scatter(x=mu_truth_kd[:, 0], y=mu_truth_kd[:, 1], color='red', s=100, marker='x') # 真の平均
+plt.contour(mu_0_grid, mu_1_grid, prior_density.reshape(mu_dim)) # 事前分布
+plt.suptitle('Gaussian Mixture Model', fontsize=20)
+plt.title('iter:' + str(0) + ', K=' + str(K), loc='left')
+plt.xlabel('$\mu_1$')
+plt.ylabel('$\mu_2$')
+plt.colorbar()
+plt.show()
+
+#%%
+
+## 初期値の設定
+
+# 観測モデルのパラメータをサンプル
+mu_kd = np.empty((K, D))
+lambda_kdd = np.empty((K, D, D))
+for k in range(K):
+    # クラスタkの精度行列をサンプル
+    lambda_kdd[k] = wishart.rvs(df=nu, scale=w_dd, size=1)
+    
+    # クラスタkの平均をサンプル
+    mu_kd[k] = np.random.multivariate_normal(
+        mean=m_d, cov=np.linalg.inv(beta * lambda_kdd[k])
+    ).flatten()
+print(mu_kd)
+print(lambda_kdd)
+
+# 混合比率をサンプル
+pi_k = dirichlet.rvs(alpha=alpha_k, size=1).flatten()
 print(pi_k)
 
 #%%
 
+# 初期値による混合分布を計算
+init_density = 0
+for k in range(K):
+    # クラスタkの確率密度を計算
+    tmp_density = multivariate_normal.pdf(
+        x=x_point, mean=mu_kd[k], cov=np.linalg.inv(beta * lambda_kdd[k])
+    )
+    
+    # K個の確率密度の加重平均を計算
+    init_density += tmp_density * pi_k[k]
+
+# 初期値による分布を作図
+plt.figure(figsize=(12, 9))
+plt.contour(x_1_grid, x_2_grid, true_model.reshape(x_dim), alpha=0.5, linestyles='dashed') # 真の分布
+plt.contour(x_1_grid, x_2_grid, init_density.reshape(x_dim)) # 初期値による分布
+plt.suptitle('Gaussian Mixture Model', fontsize=20)
+plt.title('iter:' + str(0) + ', K=' + str(K), loc='left')
+plt.xlabel('$x_1$')
+plt.ylabel('$x_2$')
+plt.colorbar()
+plt.show()
+
+#%%
+
 # 試行回数を指定
-MaxIter = 250
+MaxIter = 100
+
+# 変数を作成
+eta_nk = np.zeros((N, K))
+s_nk = np.zeros((N, K))
+beta_hat_k = np.zeros(K)
+m_hat_kd = np.zeros((K, D))
+nu_hat_k = np.zeros(K)
+w_hat_kdd = np.zeros((K, D, D))
+alpha_hat_k = np.zeros(K)
 
 # 推移の確認用の受け皿
-trace_s_in = np.zeros((MaxIter, N))
-trace_mu_ikd = np.zeros((MaxIter+1, K, D))
-trace_lambda_ikdd = np.zeros((MaxIter+1, K, D, D))
-trace_mu_ikd[0] = mu_kd.copy()
-trace_lambda_ikdd[0] = lambda_kdd.copy()
+trace_s_in = [np.repeat(np.nan, N)]
+trace_mu_ikd = [mu_kd.copy()]
+trace_lambda_ikdd = [lambda_kdd.copy()]
+trace_pi_ik = [pi_k.copy()]
+trace_beta_ik = [np.repeat(beta, K)]
+trace_m_ikd = [np.repeat(m_d.reshape((1, D)), K, axis=0)]
+trace_w_ikdd = [np.repeat(w_dd.reshape((1, D, D)), K, axis=0)]
+trace_nu_ik = [np.repeat(nu, K)]
+trace_alpha_ik = [alpha_k.copy()]
 
 # ギブスサンプリング
 for i in range(MaxIter):
     
-    # 初期化
-    eta_nk = np.zeros((N, K))
-    s_nk = np.zeros((N, K))
-    beta_hat_k = np.zeros(K)
-    m_hat_kd = np.zeros((K, D))
-    nu_hat_k = np.zeros(K)
-    w_hat_kdd = np.zeros((K, D, D))
-    alpha_hat_k = np.zeros(K)
-    
-    # 潜在変数のパラメータを計算：式(4.94)
+    # 潜在変数の事後分布のパラメータを計算:式(4.94)
     for k in range(K):
         tmp_eta_n = np.diag(
             -0.5 * (x_nd - mu_kd[k]).dot(lambda_kdd[k]).dot((x_nd - mu_kd[k]).T)
-        ).copy()
+        ).copy() # (何故か書き替え禁止になるのを防ぐためのcopy())
         tmp_eta_n += 0.5 * np.log(np.linalg.det(lambda_kdd[k]) + 1e-7)
         tmp_eta_n += np.log(pi_k[k] + 1e-7)
         eta_nk[:, k] = np.exp(tmp_eta_n)
@@ -169,286 +302,281 @@ for i in range(MaxIter):
     pi_k = dirichlet.rvs(size=1, alpha=alpha_hat_k).flatten()
     
     # 値を記録
-    _, trace_s_in[i] = np.where(s_nk == 1)
-    trace_mu_ikd[i+1] = mu_kd.copy()
-    trace_lambda_ikdd[i+1] = lambda_kdd.copy()
+    _, s_n = np.where(s_nk == 1)
+    trace_s_in.append(s_n.copy())
+    trace_mu_ikd.append(mu_kd.copy())
+    trace_lambda_ikdd.append(lambda_kdd.copy())
+    trace_pi_ik.append(pi_k.copy())
+    trace_beta_ik.append(beta_hat_k.copy())
+    trace_m_ikd.append(m_hat_kd.copy())
+    trace_w_ikdd.append(w_hat_kdd.copy())
+    trace_nu_ik.append(nu_hat_k.copy())
+    trace_alpha_ik.append(alpha_hat_k.copy())
     
     # 動作確認
     print(str(i+1) + ' (' + str(np.round((i + 1) / MaxIter * 100, 1)) + '%)')
 
 #%%
 
-# 観測モデルを計算
-z_kline = np.empty((K, len(x_line)))
+# muの事後分布の分散共分散行列を計算
+sigma2_mu_kdd = np.empty((K, D, D))
 for k in range(K):
-    tmp_z_line = [
-        multivariate_normal.pdf(
-            x=(x, y), mean=mu_kd[k], cov=np.linalg.inv(lambda_kdd[k])
-        ) for x, y in zip(x_line, y_line)
-    ]
-    z_kline[k] = tmp_z_line.copy()
-Z_kline = z_kline.reshape((K, *X_line.shape))
+    sigma2_mu_kdd[k] = np.linalg.inv(
+        beta_hat_k[k] * nu_hat_k[k] * w_hat_kdd[k]
+    )
+
+# muの事後分布を計算
+posterior_density_kg = np.empty((K, mu_point.shape[0]))
+for k in range(K):
+    # クラスタkのmuの事後分布を計算
+    posterior_density_kg[k] = multivariate_normal.pdf(
+        x=mu_point, mean=m_hat_kd[k], cov=sigma2_mu_kdd[k]
+    )
+
+# muの事後分布をを作図
+plt.figure(figsize=(12, 9))
+plt.scatter(x=mu_truth_kd[:, 0], y=mu_truth_kd[:, 1], color='red', s=100, marker='x') # 真の平均
+for k in range(K):
+    plt.contour(mu_0_grid, mu_1_grid, posterior_density_kg[k].reshape(mu_dim)) # 事後分布
+plt.suptitle('Gaussian Mixture Model', fontsize=20)
+plt.title('iter:' + str(MaxIter) + ', N=' + str(N) + ', K=' + str(K), loc='left')
+plt.xlabel('$\mu_1$')
+plt.ylabel('$\mu_2$')
+plt.colorbar()
+plt.show()
 
 #%%
 
-# 各データのクラスタを抽出
-_, s_n = np.where(s_nk == 1)
-
-# サンプルしたパラメータによるモデルを作図
-fig = plt.figure(figsize=(10, 10))
+# 最後のサンプルによる混合分布を計算
+res_density = 0
 for k in range(K):
-    plt.contour(X_line, Y_line, Z_kline[k]) # 観測モデル
-    plt.contour(X_line, Y_line, Z_true_kline[k], linestyles='dotted', alpha=0.5) # 真の観測モデル
-    k_idx = np.where(s_n == k) # クラスタkのインデックスを取得
-    plt.scatter(x_nd[k_idx, 0], x_nd[k_idx, 1], label='cluster'+str(k+1)) # 観測データ
-plt.scatter(mu_true_kd[:, 0], mu_true_kd[:, 1], marker='+', s=100, alpha=0.5) # 真の平均
-plt.suptitle('Gibbs Sampling', fontsize=20)
-plt.title('K=' + str(K) + ', N=' + str(N) + ', iter:' + str(MaxIter), loc='left', fontsize=20)
-plt.xlabel('$x_{1}$')
-plt.ylabel('$x_{2}$')
+    # クラスタkの確率密度を計算
+    tmp_density = multivariate_normal.pdf(
+        x=x_point, mean=mu_kd[k], cov=np.linalg.inv(lambda_kdd[k])
+    )
+    
+    # K個の確率密度の加重平均を計算
+    res_density += tmp_density * pi_k[k]
+
+# 最後のサンプルによる分布を作図
+plt.figure(figsize=(12, 9))
+plt.contour(x_1_grid, x_2_grid, true_model.reshape(x_dim), alpha=0.5, linestyles='dashed') # 真の分布
+plt.contour(x_1_grid, x_2_grid, res_density.reshape(x_dim)) # 最後のサンプルによる分布:(等高線)
+#plt.contourf(x_1_grid, x_2_grid, res_density.reshape(x_dim), alpha=0.5) # 最後のサンプルによる分布:(塗りつぶし)
+plt.scatter(x=mu_truth_kd[:, 0], y=mu_truth_kd[:, 1], color='red', s=100, marker='x') # 真の平均
+for k in range(K):
+    k_idx, = np.where(s_n == k)
+    plt.scatter(x=x_nd[k_idx, 0], y=x_nd[k_idx, 1], label='cluster:' + str(k + 1)) # サンプルしたクラスタ
+plt.suptitle('Gaussian Mixture Model:Gibbs Sampling', fontsize=20)
+plt.title('iter:' + str(MaxIter) + ', N=' + str(N) + ', K=' + str(K), loc='left')
+plt.xlabel('$x_1$')
+plt.ylabel('$x_2$')
+plt.colorbar()
 plt.show()
 
 #%%
 
 # muの推移を確認
-fig = plt.figure(figsize=(15, 10))
+plt.figure(figsize=(12, 9))
 for k in range(K):
     for d in range(D):
-        plt.plot(np.arange(MaxIter+1), trace_mu_ikd[:, k, d], 
-                 label='k=' + str(k+1) + ', d=' + str(d+1))
+        plt.plot(np.arange(MaxIter+1), np.array(trace_mu_ikd)[:, k, d], 
+                 label='k=' + str(k + 1) + ', d=' + str(d + 1))
 plt.xlabel('iteration')
 plt.ylabel('value')
+plt.suptitle('Gibbs Sampling', fontsize=20)
+plt.title('$\mu$', loc='left')
 plt.legend()
 plt.show()
 
 #%%
 
 # lambdaの推移を確認
-fig = plt.figure(figsize=(15, 10))
+plt.figure(figsize=(12, 9))
 for k in range(K):
     for d1 in range(D):
         for d2 in range(D):
-            plt.plot(np.arange(MaxIter+1), trace_lambda_ikdd[:, k, d1, d2], 
-                 label='k=' + str(k+1) + ', d=' + str(d1+1) + ', d''=' + str(d2+1))
+            plt.plot(np.arange(MaxIter + 1), np.array(trace_lambda_ikdd)[:, k, d1, d2], 
+                     alpha=0.5, label='k=' + str(k + 1) + ', d=' + str(d1 + 1) + ', d''=' + str(d2 + 1))
 plt.xlabel('iteration')
 plt.ylabel('value')
+plt.suptitle('Gibbs Sampling', fontsize=20)
+plt.title('$\Lambda$', loc='left')
 plt.legend()
 plt.show()
 
 #%%
 
-# gif画像で推移の確認
+# piの推移を確認
+plt.figure(figsize=(12, 9))
+for k in range(K):
+    plt.plot(np.arange(MaxIter + 1), np.array(trace_pi_ik)[:, k], label='k=' + str(k + 1))
+plt.xlabel('iteration')
+plt.ylabel('value')
+plt.suptitle('Gibbs Sampling', fontsize=20)
+plt.title('$\pi$', loc='left')
+plt.legend()
+plt.show()
 
 #%%
+
+# betaの推移を確認
+plt.figure(figsize=(12, 9))
+for k in range(K):
+    plt.plot(np.arange(MaxIter + 1), np.array(trace_beta_ik)[:, k], label='k=' + str(k + 1))
+plt.xlabel('iteration')
+plt.ylabel('value')
+plt.suptitle('Gibbs Sampling', fontsize=20)
+plt.title('$\hat{\\beta}$', loc='left')
+plt.legend()
+plt.show()
+
+#%%
+
+# mの推移を確認
+plt.figure(figsize=(12, 9))
+for k in range(K):
+    for d in range(D):
+        plt.plot(np.arange(MaxIter+1), np.array(trace_m_ikd)[:, k, d], 
+                 label='k=' + str(k + 1) + ', d=' + str(d + 1))
+plt.xlabel('iteration')
+plt.ylabel('value')
+plt.suptitle('Gibbs Sampling', fontsize=20)
+plt.title('$\hat{m}$', loc='left')
+plt.legend()
+plt.show()
+
+#%%
+
+# wの推移を確認
+plt.figure(figsize=(12, 9))
+for k in range(K):
+    for d1 in range(D):
+        for d2 in range(D):
+            plt.plot(np.arange(MaxIter + 1), np.array(trace_w_ikdd)[:, k, d1, d2], 
+                     alpha=0.5, label='k=' + str(k + 1) + ', d=' + str(d1 + 1) + ', d''=' + str(d2 + 1))
+plt.xlabel('iteration')
+plt.ylabel('value')
+plt.suptitle('Gibbs Sampling', fontsize=20)
+plt.title('$\hat{w}$', loc='left')
+plt.legend()
+plt.show()
+
+#%%
+
+# nuの推移を確認
+plt.figure(figsize=(12, 9))
+for k in range(K):
+    plt.plot(np.arange(MaxIter + 1), np.array(trace_nu_ik)[:, k], label='k=' + str(k + 1))
+plt.xlabel('iteration')
+plt.ylabel('value')
+plt.suptitle('Gibbs Sampling', fontsize=20)
+plt.title('$\hat{\\nu}$', loc='left')
+plt.legend()
+plt.show()
+
+#%%
+
+# alphaの推移を確認
+plt.figure(figsize=(12, 9))
+for k in range(K):
+    plt.plot(np.arange(MaxIter + 1), np.array(trace_alpha_ik)[:, k], label='k=' + str(k + 1))
+plt.xlabel('iteration')
+plt.ylabel('value')
+plt.suptitle('Gibbs Sampling', fontsize=20)
+plt.title('$\hat{\\alpha}$', loc='left')
+plt.legend()
+plt.show()
+
+#%%
+
+## アニメーションによる確認
 
 # 追加ライブラリ
 import matplotlib.animation as animation
 
 #%%
 
-# 観測モデルを計算
-Z_ikline = np.zeros((MaxIter+1, K, *X_line.shape))
-for i in range(MaxIter + 1):
-    z_kline = np.empty((K, len(x_line)))
-    for k in range(K):
-        tmp_z_line = [
-            multivariate_normal.pdf(
-                x=(x, y), mean=trace_mu_ikd[i, k], cov=np.linalg.inv(trace_lambda_ikdd[i, k])
-                ) for x, y in zip(x_line, y_line)
-            ]
-        z_kline[k] = tmp_z_line.copy()
-    Z_ikline[i] = z_kline.reshape((K, *X_line.shape))
-    
-    # 動作確認
-    print(str(i) + ' (' + str(np.round((i) / (MaxIter) * 100, 1)) + '%)')
+## 事後分布の推移の確認
 
-#%%
-
-# グラフを初期化
-plt.cla()
-
-# グラフを作成
-fig = plt.figure(figsize=(12, 12))
-fig.suptitle('Gibbs Sampling', fontsize=20)
-ax = fig.add_subplot(1, 1, 1)
+# 画像サイズを指定
+fig = plt.figure(figsize=(12, 9))
 
 # 作図処理を関数として定義
-def update(i):
+def update_posterior(i):
+    # i回目のmuの事後分布の分散共分散行列を計算
+    E_sigma2_mu_kdd = np.empty((K, D, D))
+    for k in range(K):
+        E_sigma2_mu_kdd[k] = np.linalg.inv(
+            trace_beta_ik[i][k] * trace_nu_ik[i][k] * trace_w_ikdd[i][k]
+        )
+    
+    # i回目のmuの事後分布を計算
+    posterior_density_kg = np.empty((K, mu_point.shape[0]))
+    for k in range(K):
+        # クラスタkのmuの事後分布を計算
+        posterior_density_kg[k] = multivariate_normal.pdf(
+            x=mu_point, mean=trace_m_ikd[i][k], cov=E_sigma2_mu_kdd[k]
+        )
     
     # 前フレームのグラフを初期化
-    ax.cla()
+    plt.cla()
     
-    # nフレーム目のグラフを描画
+    # i回目のmuの事後分布をを作図
+    plt.scatter(x=mu_truth_kd[:, 0], y=mu_truth_kd[:, 1], color='red', s=100, marker='x') # 真の平均
     for k in range(K):
-        ax.contour(X_line, Y_line, Z_ikline[i, k]) # 観測モデル
-        ax.contour(X_line, Y_line, Z_true_kline[k], linestyles='dotted', alpha=0.5) # 真の観測モデル
-        if i > 0: # 初期値以外のとき
-            k_idx = np.where(trace_s_in[i-1] == k) # クラスタkのインデックスを取得
-            ax.scatter(x_nd[k_idx, 0], x_nd[k_idx, 1], label='cluster'+str(k+1)) # クラスタkの観測データ
-    if i == 0: # 初期値のとき
-        ax.scatter(x_nd[:, 0], x_nd[:, 1]) # 全ての観測データ
-    ax.scatter(mu_true_kd[:, 0], mu_true_kd[:, 1], marker='+', s=100, alpha=0.5) # 真の平均
-    
-    # グラフの設定
-    ax.set_title('K=' + str(K) + ', N=' + str(N) + ', iter:' + str(i), loc='left', fontsize=20)
-    ax.set_xlabel('$x_{1}$')
-    ax.set_ylabel('$x_{2}$')
+        plt.contour(mu_0_grid, mu_1_grid, posterior_density_kg[k].reshape(mu_dim)) # 事後分布
+    plt.suptitle('Gaussian Mixture Model:Gibbs Sampling', fontsize=20)
+    plt.title('iter:' + str(i) + ', N=' + str(N) + ', K=' + str(K), loc='left')
+    plt.xlabel('$\mu_1$')
+    plt.ylabel('$\mu_2$')
 
 # gif画像を作成
-ani = animation.FuncAnimation(fig, update, frames=MaxIter + 1, interval=100)
-#ani.save("ch4_4_2_trace.gif")
-
-
-#%%
-
-# burn-in？
-
-'''
-未完というか不明
-'''
+posterior_anime = animation.FuncAnimation(fig, update_posterior, frames=MaxIter + 1, interval=100)
+posterior_anime.save("ch4_4_2_Posterior.gif")
 
 #%%
 
-# 事後分布のパラメータを事前分布のパラメータに設定
-beta_k = beta_hat_k.copy()
-m_kd = m_hat_kd.copy()
-nu_k = nu_hat_k.copy()
-w_kdd = w_hat_kdd.copy()
-alpha_k = alpha_hat_k.copy()
+## サンプルによる分布の推移の確認
 
-# 試行回数を指定
-MaxIter = 300
+# 画像サイズを指定
+fig = plt.figure(figsize=(12, 9))
 
-# 推移の確認用の受け皿
-trace_s_in = np.zeros((MaxIter, N))
-trace_mu_ikd = np.zeros((MaxIter+1, K, D))
-trace_lambda_ikdd = np.zeros((MaxIter+1, K, D, D))
-trace_mu_ikd[0] = mu_kd.copy()
-trace_lambda_ikdd[0] = lambda_kdd.copy()
-
-# ギブスサンプリング
-for i in range(MaxIter):
-    
-    # 初期化
-    eta_nk = np.zeros((N, K))
-    s_nk = np.zeros((N, K))
-    beta_hat_k = np.zeros(K)
-    m_hat_kd = np.zeros((K, D))
-    nu_hat_k = np.zeros(K)
-    w_hat_kdd = np.zeros((K, D, D))
-    alpha_hat_k = np.zeros(K)
-    
-    # 潜在変数のパラメータを計算：式(4.94)
+# 作図処理を関数として定義
+def update_model(i):
+    # i回目のサンプルによる混合分布を計算
+    res_density = 0
     for k in range(K):
-        tmp_eta_n = np.diag(
-            -0.5 * (x_nd - mu_kd[k]).dot(lambda_kdd[k]).dot((x_nd - mu_kd[k]).T)
-        ).copy()
-        tmp_eta_n += 0.5 * np.log(np.linalg.det(lambda_kdd[k]) + 1e-7)
-        tmp_eta_n += np.log(pi_k[k] + 1e-7)
-        eta_nk[:, k] = np.exp(tmp_eta_n)
-    eta_nk /= np.sum(eta_nk, axis=1, keepdims=True) # 正規化
+        # クラスタkの確率密度を計算
+        tmp_density = multivariate_normal.pdf(
+            x=x_point, 
+            mean=trace_mu_ikd[i][k], 
+            cov=np.linalg.inv(trace_lambda_ikdd[i][k])
+        )
+        
+        # K個の確率密度の加重平均を計算
+        res_density += tmp_density * trace_pi_ik[i][k]
     
-    # 潜在変数をサンプル：式(4.93)
-    for n in range(N):
-        s_nk[n] = np.random.multinomial(n=1, pvals=eta_nk[n], size=1).flatten()
+    # 前フレームのグラフを初期化
+    plt.cla()
     
-    # 観測モデルのパラメータをサンプリング
+    # i回目のサンプルによる分布を作図
+    plt.contour(x_1_grid, x_2_grid, true_model.reshape(x_dim), alpha=0.5, linestyles='dashed') # 真の分布
+    plt.contourf(x_1_grid, x_2_grid, res_density.reshape(x_dim), alpha=0.5) # サンプルによる分布
+    plt.scatter(x=mu_truth_kd[:, 0], y=mu_truth_kd[:, 1], color='red', s=100, marker='x') # 真の平均
     for k in range(K):
-        
-        # muの事後分布のパラメータを計算：式(4.99)
-        beta_hat_k[k] = np.sum(s_nk[:, k]) + beta_k[k]
-        m_hat_kd[k] = np.sum(s_nk[:, k] * x_nd.T, axis=1)
-        m_hat_kd[k] += beta_k[k] * m_kd[k]
-        m_hat_kd[k] /= beta_hat_k[k]
-        
-        # lambdaの事後分布のパラメータを計算：式(4.103)
-        nu_hat_k[k] = np.sum(s_nk[:, k]) + nu_k[k]
-        tmp_w_dd = np.dot((s_nk[:, k] * x_nd.T), x_nd)
-        tmp_w_dd += beta_k[k] * np.dot(m_kd[k].reshape(D, 1), m_kd[k].reshape(1, D))
-        tmp_w_dd -= beta_hat_k[k] * np.dot(m_hat_kd[k].reshape(D, 1), m_hat_kd[k].reshape(1, D))
-        tmp_w_dd += np.linalg.inv(w_kdd[k])
-        w_hat_kdd[k] = np.linalg.inv(tmp_w_dd)
-        
-        # lambdaをサンプル：式(4.102)
-        lambda_kdd[k] = wishart.rvs(size=1, df=nu_hat_k[k], scale=w_hat_kdd[k])
-        
-        # muをサンプル：式(4.98)
-        mu_kd[k] = np.random.multivariate_normal(
-            mean=m_hat_kd[k], cov=np.linalg.inv(beta_hat_k[k] * lambda_kdd[k]), size=1
-        ).flatten()
-    
-    # 混合比率のパラメータを計算：式(4.45)
-    alpha_hat_k = np.sum(s_nk, axis=0) + alpha_k
-    
-    # piをサンプル：式(4.44)
-    pi_k = dirichlet.rvs(size=1, alpha=alpha_hat_k).flatten()
-    
-    # 値を記録
-    _, trace_s_in[i] = np.where(s_nk == 1)
-    trace_mu_ikd[i+1] = mu_kd.copy()
-    trace_lambda_ikdd[i+1] = lambda_kdd.copy()
-    
-    # 動作確認
-    print(str(i+1) + ' (' + str(np.round((i + 1) / MaxIter * 100, 1)) + '%)')
+        k_idx, = np.where(trace_s_in[i] == k)
+        plt.scatter(x=x_nd[k_idx, 0], y=x_nd[k_idx, 1], label='cluster:' + str(k + 1)) # クラスタのサンプル
+        plt.suptitle('Gaussian Mixture Model:Gibbs Sampling', fontsize=20)
+    plt.title('iter:' + str(i) + ', N=' + str(N) + ', K=' + str(K), loc='left')
+    plt.xlabel('$x_1$')
+    plt.ylabel('$x_2$')
+    plt.legend()
 
-#%%
+# gif画像を作成
+posterior_anime = animation.FuncAnimation(fig, update_model, frames=MaxIter + 1, interval=100)
+posterior_anime.save("ch4_4_2_Model.gif")
 
-# 観測モデルを計算
-z_kline = np.empty((K, len(x_line)))
-for k in range(K):
-    tmp_z_line = [
-        multivariate_normal.pdf(
-            x=(x, y), mean=mu_kd[k], cov=np.linalg.inv(lambda_kdd[k])
-        ) for x, y in zip(x_line, y_line)
-    ]
-    z_kline[k] = tmp_z_line.copy()
-Z_kline = z_kline.reshape((K, *X_line.shape))
-
-#%%
-
-# 各データのクラスタを抽出
-_, s_n = np.where(s_nk == 1)
-
-# サンプルしたパラメータによるモデルを作図
-fig = plt.figure(figsize=(10, 10))
-for k in range(K):
-    plt.contour(X_line, Y_line, Z_kline[k]) # 観測モデル
-    plt.contour(X_line, Y_line, Z_true_kline[k], linestyles='dotted', alpha=0.5) # 真の観測モデル
-    k_idx = np.where(s_n == k) # クラスタkのインデックスを取得
-    plt.scatter(x_nd[k_idx, 0], x_nd[k_idx, 1], label='cluster'+str(k+1)) # 観測データ
-plt.scatter(mu_true_kd[:, 0], mu_true_kd[:, 1], marker='+', s=100, alpha=0.5) # 真の平均
-plt.suptitle('Gibbs Sampling', fontsize=20)
-plt.title('K=' + str(K) + ', N=' + str(N) + ', iter:' + str(MaxIter), loc='left', fontsize=20)
-plt.xlabel('$x_{1}$')
-plt.ylabel('$x_{2}$')
-plt.show()
-
-#%%
-
-# muの推移を確認
-fig = plt.figure(figsize=(10, 10))
-for k in range(K):
-    for d in range(D):
-        plt.plot(np.arange(MaxIter+1), trace_mu_ikd[:, k, d], 
-                 label='k=' + str(k+1) + ', d=' + str(d+1))
-plt.xlabel('iteration')
-plt.ylabel('value')
-plt.legend()
-plt.show()
-
-#%%
-
-# lambdaの推移を確認
-fig = plt.figure(figsize=(10, 10))
-for k in range(K):
-    for d1 in range(D):
-        for d2 in range(D):
-            plt.plot(np.arange(MaxIter+1), trace_lambda_ikdd[:, k, d1, d2], 
-                 label='k=' + str(k+1) + ', d=' + str(d1+1) + ', d''=' + str(d2+1))
-plt.xlabel('iteration')
-plt.ylabel('value')
-plt.legend()
-plt.show()
 
 #%%
 
