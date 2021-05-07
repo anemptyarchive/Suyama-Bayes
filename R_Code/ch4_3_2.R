@@ -3,13 +3,12 @@
 
 # 4.3.2項で利用するパッケージ
 library(tidyverse)
-library(gganimate)
 
 
 ### 観測モデル(ポアソン混合分布)の設定 -----
 
-# 真のパラメータを指定
-lambda_truth_k <- c(5, 25, 50)
+# K個の真のパラメータを指定
+lambda_truth_k <- c(10, 25, 40)
 
 # 真の混合比率を指定
 pi_truth_k <- c(0.35, 0.25, 0.4)
@@ -25,10 +24,10 @@ x_vec <- seq(0, 2 * max(lambda_truth_k))
 model_prob <- 0
 for(k in 1:K) {
   # クラスタkの分布の確率を計算
-  tmp_prob <- dpois(x = x_vec, lambda_truth_k[k])
+  tmp_prob <- dpois(x = x_vec, lambda = lambda_truth_k[k])
   
   # K個の分布の加重平均を計算
-  model_prob <- model_prob + tmp_prob * pi_truth_k[k]
+  model_prob <- model_prob + pi_truth_k[k] * tmp_prob
 }
 
 # 観測モデルをデータフレームに格納
@@ -40,7 +39,7 @@ model_df <- tibble(
 # 観測モデルを作図
 ggplot(model_df, aes(x = x, y = prob)) + 
   geom_bar(stat = "identity", position = "dodge", 
-           fill = "purple", color = "purple") + # 真の分布
+           fill = "blue", color = "blue") + # 真の分布
   labs(title = "Poisson Mixture Model", 
        subtitle = paste0("lambda=(", paste0(lambda_truth_k, collapse = ", "), ")"))
 
@@ -59,7 +58,7 @@ s_truth_n <- which(t(s_truth_nk) == 1, arr.ind = TRUE) %>%
   .[, "row"]
 
 # (観測)データを生成
-x_n <- rpois(n = N, lambda = apply(lambda_truth_k^t(s_truth_nk), 2, prod))
+#x_n <- rpois(n = N, lambda = apply(lambda_truth_k^t(s_truth_nk), 2, prod))
 x_n <- rpois(n = N, lambda = lambda_truth_k[s_truth_n])
 
 # 観測データを確認
@@ -78,7 +77,9 @@ ggplot() +
   geom_bar(data = model_df, aes(x = x, y = prob), stat = "identity", position = "dodge", 
            alpha = 0, color = "red", linetype = "dashed") + # 真の分布
   labs(title = "Poisson Mixture Model", 
-       subtitle = paste0("N=", N, ", lambda=(", paste0(lambda_truth_k, collapse = ", "), ")"), 
+       subtitle = paste0("N=", N, 
+                         ", lambda=(", paste0(lambda_truth_k, collapse = ", "), ")", 
+                         ", pi=(", paste0(pi_truth_k, collapse = ", "), ")"), 
        x = "x")
 
 # クラスタのヒストグラムを作成
@@ -102,6 +103,24 @@ b <- 1
 alpha_k <- rep(2, K)
 
 
+# 作図用のlambdaの点を作成
+lambda_vec <- seq(0, 2 * max(lambda_truth_k), length.out = 1000)
+
+# lambdaの事前分布を計算
+prior_df <- tibble(
+  lambda = lambda_vec, 
+  density = dgamma(x = lambda, shape = a, rate = b)
+)
+
+# lambdaの事前分布を作図
+ggplot(prior_df, aes(x = lambda, y = density)) + 
+  geom_line(color = "purple") + # 事前分布
+  geom_vline(xintercept = lambda_truth_k, color = "red", linetype = "dashed") + # 真の値
+  labs(title = "Gamma Distribution", 
+       subtitle = paste0("a=", b, ", b=", b), 
+       x = expression(lambda))
+
+
 # 事前分布の平均による分布をデータフレームに格納
 E_prior_df <- tibble(
   x = x_vec, 
@@ -113,7 +132,7 @@ ggplot(E_prior_df, aes(x = x, y = prob)) +
   geom_bar(stat = "identity", position = "dodge", 
            fill = "purple", color = "purple") + # 初期値による分布
   labs(title = "Poisson Distribution", 
-       subtitle = paste0("iter:", 0, ", lambda=", round(a / b, 2)))
+       subtitle = paste0("E[lambda]=", round(a / b, 2)))
 
 
 ### 初期値の設定 -----
@@ -146,6 +165,8 @@ init_df <- tibble(
 ggplot(init_df, aes(x = x, y = prob)) + 
   geom_bar(stat = "identity", position = "dodge", 
            fill = "purple", color = "purple") + # 初期値による分布
+  geom_bar(data = model_df, aes(x = x, y = prob), stat = "identity", position = "dodge", 
+           alpha = 0, color = "red", linetype = "dashed") + # 真の分布
   labs(title = "Poisson Mixture Model", 
        subtitle = paste0("iter:", 0, 
                          ", lambda=(", paste0(round(lambda_k, 2), collapse = ", "), ")"))
@@ -157,7 +178,7 @@ ggplot(init_df, aes(x = x, y = prob)) +
 MaxIter <- 100
 
 
-# 受け皿を作成
+# 変数を初期化
 eta_nk <- matrix(0, nrow = N, ncol = K)
 s_nk <- matrix(0, nrow = N, ncol = K)
 
@@ -218,14 +239,14 @@ for(i in 1:MaxIter) {
 }
 
 
-### パラメータの事後分布の確認 -----
+### 推論結果の確認 -----
 
 # lambdaの事後分布をデータフレームに格納
 posterior_lambda_df <- tibble()
 for(k in 1:K) {
-  # クラスタkの事後分布を計算
+  # クラスタkのlambdaの事後分布を計算
   tmp_posterior_df <- tibble(
-    lambda = seq(0, 2 * max(lambda_truth_k), length.out = 1000), # 作図用のlambdaの点
+    lambda = lambda_vec, 
     density = dgamma(x = lambda, shape = a_hat_k[k], rate = b_hat_k[k]), 
     cluster = as.factor(k)
   )
@@ -236,25 +257,23 @@ for(k in 1:K) {
 
 # lambdaの事後分布を作図
 ggplot(posterior_lambda_df, aes(x = lambda, y = density, color = cluster)) + 
-  geom_line() + # lambdaの事後分布
+  geom_line() + # 事後分布
   geom_vline(xintercept = lambda_truth_k, color = "red", linetype = "dashed") + # 真の値
-  labs(title = "Poisson mixture model:Gibbs Sampling", 
+  labs(title = "Gamma Distribution:Gibbs Sampling", 
        subtitle = paste0("iter:", MaxIter, ", N=", N, 
-                         ", a=(", paste0(a_hat_k, collapse = ", "), 
-                         "), b=(", paste0(b_hat_k, collapse = ", "), ")"), 
+                         ", a=(", paste0(a_hat_k, collapse = ", "), ")", 
+                         ", b=(", paste0(b_hat_k, collapse = ", "), ")"), 
        x = expression(lambda))
 
-
-### 最後のサンプルの確認 -----
 
 # 最後のサンプルによる混合分布を計算
 res_prob <- 0
 for(k in 1:K) {
   # クラスタkの分布の確率を計算
-  tmp_prob <- dpois(x = x_vec, lambda_k[k])
+  tmp_prob <- dpois(x = x_vec, lambda = lambda_k[k])
   
   # K個の分布の加重平均を計算
-  res_prob <- res_prob + tmp_prob * pi_k[k]
+  res_prob <- res_prob + pi_k[k] * tmp_prob
 }
 
 # 最後のサンプルによる分布をデータフレームに格納
@@ -271,7 +290,8 @@ ggplot() +
            alpha = 0, color = "red", linetype = "dashed") + # 真の分布
   labs(title = "Poisson Mixture Model:Gibbs Sampling", 
        subtitle = paste0("iter:", MaxIter, ", N=", N, 
-                         ", lambda=(", paste0(round(lambda_k, 2), collapse = ", "), ")"))
+                         ", lambda=(", paste0(round(lambda_k, 2), collapse = ", "), ")", 
+                         ", pi=(", paste0(round(pi_k, 2), collapse = ", "), ")"))
 
 
 # 最後のクラスタをデータフレームに格納
@@ -314,6 +334,7 @@ ggplot(trace_a_df, aes(x = iteration, y = value, color = cluster)) +
   labs(title = "Gibbs Sampling", 
        subtitle = expression(hat(bold(a))))
 
+
 # bの推移をデータフレームに格納
 trace_a_df <- dplyr::as_tibble(trace_b_ik) %>% # データフレームに変換
   cbind(iteration = 0:MaxIter) %>% # 試行回数の列を追加
@@ -330,6 +351,7 @@ ggplot(trace_a_df, aes(x = iteration, y = value, color = cluster)) +
   geom_line() + 
   labs(title = "Gibbs Sampling", 
        subtitle = expression(hat(bold(b))))
+
 
 # alphaの推移を作図
 trace_alpha_df <- dplyr::as_tibble(trace_alpha_ik) %>% # データフレームに変換
@@ -368,6 +390,7 @@ ggplot(trace_lambda_df, aes(x = iteration, y = value, color = cluster)) +
   geom_hline(yintercept = lambda_truth_k, color = "red", linetype = "dashed") + # 真の値
   labs(title = "Gibbs Sampling", 
        subtitle = expression(hat(lambda)))
+
 
 # piの推移をデータフレームに格納
 trace_pi_df <- dplyr::as_tibble(trace_pi_ik) %>% # データフレームに変換
@@ -410,8 +433,8 @@ for(i in 1:(MaxIter + 1)) {
       cluster = as.factor(k), 
       label = paste0(
         "iter:", i - 1, ", N=", N, 
-        ", a=(", paste0(trace_a_ik[i, ], collapse = ", "), 
-        "), b=(", paste0(trace_b_ik[i, ], collapse = ", "), ")"
+        ", a=(", paste0(trace_a_ik[i, ], collapse = ", "), ")", 
+        ", b=(", paste0(trace_b_ik[i, ], collapse = ", "), ")"
       ) %>% 
         as.factor()
     )
@@ -429,7 +452,7 @@ trace_graph <- ggplot() +
   geom_line(data = trace_posterior_lambda_df, aes(x = lambda, y = density, color = cluster)) + # lambdaの事後分布
   geom_vline(xintercept = lambda_truth_k, color = "red", linetype = "dashed") + # 真の値
   gganimate::transition_manual(label) + # フレーム
-  labs(title = "Poisson mixture model:Gibbs Sampling", 
+  labs(title = "Gamma Distribution:Gibbs Sampling", 
        subtitle = "{current_frame}", 
        x = expression(lambda))
 
@@ -453,13 +476,14 @@ for(i in 1:(MaxIter + 1)) {
     res_prob <- res_prob + tmp_prob * trace_pi_ik[i, k]
   }
   
-  # 最後のサンプルによる分布をデータフレームに格納
+  # i回目のサンプルによる分布をデータフレームに格納
   res_df <- tibble(
     x = x_vec, 
     prob = res_prob, 
     label = paste0(
       "iter:", i - 1, ", N=", N, 
-      ", lambda=(", paste0(round(trace_lambda_ik[i, ], 2), collapse = ", "), ")"
+      ", lambda=(", paste0(round(trace_lambda_ik[i, ], 2), collapse = ", "), ")", 
+      ", pi=(", paste0(round(trace_lambda_ik[i, ], 2), collapse = ", "), ")"
     ) %>% 
       as.factor()
   )
@@ -479,6 +503,9 @@ for(i in 1:(MaxIter + 1)) {
   # i回目の結果を結合
   trace_model_df <- rbind(trace_model_df, res_df)
   trace_cluster_df <- rbind(trace_cluster_df, s_df)
+  
+  # 動作確認
+  print(paste0((i - 1), ' (', round((i - 1) / MaxIter * 100, 1), '%)'))
 }
 
 # アニメーション用に複製
