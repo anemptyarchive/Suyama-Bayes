@@ -38,11 +38,12 @@ for k in range(K):
 
 # 観測モデルを作図
 plt.figure(figsize=(12, 9))
-plt.bar(x=x_line, height=model_prob) # 観測モデル
+plt.bar(x=x_line, height=model_prob) # 真の分布
 plt.xlabel('x')
 plt.ylabel('prob')
 plt.suptitle('Poisson Mixture Model', size = 20)
-plt.title('$\lambda=[' + ', '.join([str(lmd) for lmd in lambda_truth_k]) + ']$', loc='left')
+plt.title('$\lambda=[' + ', '.join([str(lmd) for lmd in lambda_truth_k]) + ']' + 
+          ', \pi=[' + ', '.join([str(pi) for pi in pi_truth_k])+ ']$', loc='left')
 plt.show()
 
 #%%
@@ -67,9 +68,9 @@ print(x_n[:10])
 
 # 観測データのヒストグラムを作成
 plt.figure(figsize=(12, 9))
+plt.bar(x=x_line, height=model_prob, label='true model', 
+        color='white', alpha=1, edgecolor='red', linestyle='--') # 真の分布
 plt.bar(x=x_line, height=[np.sum(x_n == x) / len(x_n) for x in x_line], label='observation data') # 観測データ
-plt.bar(x=x_line, height=model_prob, label='obsevation model', 
-        color='white', alpha=0.5, edgecolor='red', linestyle='--') # 真の分布
 plt.xlabel('x')
 plt.ylabel('dens')
 plt.suptitle('Poisson Mixture Model', size=20)
@@ -108,20 +109,6 @@ alpha_k = np.repeat(2.0, K)
 
 #%%
 
-# 事前分布の平均による分布を計算
-E_prior_prob = poisson.pmf(k=x_line, mu=a / b)
-
-# 事前分布の平均による分布を作図
-plt.figure(figsize=(12, 9))
-plt.bar(x=x_line, height=E_prior_prob)
-plt.xlabel('x')
-plt.ylabel('prob')
-plt.suptitle('Poisson Distribution', size=20)
-plt.title('$E[\lambda]=' + str(a / b) + '$', loc='left')
-plt.show()
-
-#%%
-
 ## 初期値の設定
 
 # lambdaを生成
@@ -149,7 +136,9 @@ plt.bar(x_line, init_prob) # 初期値による分布
 plt.xlabel('x')
 plt.ylabel('prob')
 plt.suptitle('Poisson Mixture Model', size = 20)
-plt.title('$\lambda=[' + ', '.join([str(lmd) for lmd in np.round(lambda_k, 2)]) + ']$', loc='left')
+plt.title('$iter:' + str(0) + 
+          ', \lambda=[' + ', '.join([str(lmd) for lmd in np.round(lambda_k, 2)]) + ']' + 
+          ', \pi=[' + ', '.join([str(pi) for pi in np.round(pi_k, 2)]) + ']$', loc='left')
 plt.show()
 
 #%%
@@ -268,10 +257,11 @@ color_list = ['red', 'green', 'blue']
 # 最後のクラスタのヒストグラムを作成
 plt.figure(figsize=(12, 9))
 for k in range(K):
-    plt.bar(x=x_line, height=[np.sum(x_n[s_n == k] == x) for x in x_line], 
-            alpha=0.5, label='cluster:' + str(k + 1)) # 真のクラスタ
     plt.bar(x=x_line, height=[np.sum(x_n[s_truth_n == k] == x) for x in x_line], 
-            color='white', alpha=0.5, edgecolor=color_list[k], linestyle='--', label='cluster:' + str(k + 1)) # 真のクラスタ
+            color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='cluster:' + str(k + 1)) # 真のクラスタ
+for k in range(K):
+    plt.bar(x=x_line, height=[np.sum(x_n[s_n == k] == x) for x in x_line], 
+            alpha=0.5, label='cluster:' + str(k + 1)) # 最後のクラスタ
 plt.xlabel('x')
 plt.ylabel('count')
 plt.suptitle('Poisson Mixture Model', size=20)
@@ -377,19 +367,19 @@ def update_posterior(i):
     # 前フレームのグラフを初期化
     plt.cla()
     
-    # lambdaの事後分布を計算
+    # i回目のlambdaの事後分布を計算
     posterior_lambda_k = np.empty((K, len(lambda_line)))
     for k in range(K):
         posterior_lambda_k[k] = gamma.pdf(x=lambda_line, a=trace_a_ik[i][k], scale=1 / trace_b_ik[i][k])
     
     # i回目のlambdaの事後分布を作図
     for k in range(K):
-        plt.plot(lambda_line, posterior_lambda_k[k], label='cluster:' + str(k + 1)) # lambdaの事後分布
+        plt.plot(lambda_line, posterior_lambda_k[k], label='cluster:' + str(k + 1)) # 事後分布
         plt.vlines(x=lambda_truth_k[k], ymin=0.0, ymax=np.max(posterior_lambda_k), 
                    color='red', linestyle='--') # 真の値
     plt.xlabel('$\lambda$')
     plt.ylabel('density')
-    plt.suptitle('Gamma Distribution', size=20)
+    plt.suptitle('Gamma Distribution:Gibbs Sampling', size=20)
     plt.title('$iter:' + str(i) + ', N=' + str(N) + 
               ', \hat{a}=[' + ', '.join([str(a) for a in trace_a_ik[i]]) + ']' + 
               ', \hat{b}=[' + ', '.join([str(b) for b in trace_b_ik[i]]) + ']$', loc='left')
@@ -457,13 +447,14 @@ def update_cluster(i):
     
     # i回目のクラスタの散布図を作成
     for k in range(K):
-        plt.bar(x=x_line, height=[np.sum(x_n[np.array(trace_s_in[i]) == k] == x) for x in x_line], 
-                alpha=0.5, label='cluster:' + str(k + 1)) # 真のクラスタ
         plt.bar(x=x_line, height=[np.sum(x_n[s_truth_n == k] == x) for x in x_line], 
-                color='white', alpha=0.5, edgecolor=color_list[k], linestyle='--', label='cluster:' + str(k + 1)) # 真のクラスタ
+                color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='true:' + str(k + 1)) # 真のクラスタ
+    for k in range(K):
+        plt.bar(x=x_line, height=[np.sum(x_n[np.array(trace_s_in[i]) == k] == x) for x in x_line], 
+                alpha=0.5, label='cluster:' + str(k + 1)) # サンプルしたクラスタ
     plt.xlabel('x')
     plt.ylabel('count')
-    plt.suptitle('Poisson Mixture Model', size=20)
+    plt.suptitle('Poisson Mixture Model:Gibbs Sampling', size=20)
     plt.title('$iter:' + str(i) + ', N=' + str(N) + 
               ', \lambda=[' + ', '.join([str(lmd) for lmd in np.round(trace_lambda_ik[i], 2)]) + ']' + 
               ', \pi=[' + ', '.join([str(pi) for pi in np.round(trace_pi_ik[i], 2)]) + ']$', loc='left')
