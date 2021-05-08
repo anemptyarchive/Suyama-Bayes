@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 
 ## 観測モデル(ポアソン混合分布)の設定
 
-# 真のパラメータを指定
-lambda_truth_k  = np.array([10, 25, 40])
+# K個の真のパラメータを指定
+lambda_truth_k  = np.array([10.0, 25.0, 40.0])
 
 # 真の混合比率を指定
 pi_truth_k = np.array([0.35, 0.25, 0.4])
@@ -33,7 +33,7 @@ for k in range(K):
     tmp_prob = poisson.pmf(k=x_line, mu=lambda_truth_k[k])
     
     # K個の分布の加重平均を計算
-    model_prob += tmp_prob * pi_truth_k[k]
+    model_prob += pi_truth_k[k] * tmp_prob
 
 #%%
 
@@ -108,11 +108,32 @@ b = 1.0
 # piの事前分布のパラメータを指定
 alpha_k = np.repeat(2.0, K)
 
+
+# 作図用のlambdaの点を作成
+lambda_line = np.linspace(0.0, 2.0 * np.max(lambda_truth_k), num=1000)
+
+#%%
+
+# lambdaの事前分布を計算
+prior_lambda = gamma.pdf(x=lambda_line, a=a, scale=1 / b)
+
+# lambdaの事前分布を作図
+plt.figure(figsize=(12, 9))
+plt.plot(lambda_line, prior_lambda, label='prior', color='purple') # 事前分布
+plt.vlines(x=lambda_truth_k, ymin=0.0, ymax=np.max(prior_lambda), label='true val', 
+           color='red', linestyle='--') # 真の値
+plt.xlabel('$\lambda$')
+plt.ylabel('density')
+plt.suptitle('Gamma Distribution', fontsize=20)
+plt.title('a=' + str(a) + ', b=' + str(b), loc='left')
+plt.legend()
+plt.show()
+
 #%%
 
 ## 初期値の設定
 
-# 潜在変数の事後分布の期待値の初期値を生成
+# 潜在変数の事後分布の期待値を初期化
 E_s_nk = np.random.rand(N, K)
 E_s_nk /= np.sum(E_s_nk, axis=1, keepdims=True)
 
@@ -128,9 +149,6 @@ print(alpha_hat_k)
 
 #%%
 
-# 作図用のlambdaの点を作成
-lambda_line = np.linspace(0, 2 * np.max(lambda_truth_k), num=1000)
-
 # 初期値によるlambdaの近似事後分布を作図
 posterior_lambda_kl = np.empty((K, len(lambda_line)))
 for k in range(K):
@@ -139,9 +157,9 @@ for k in range(K):
 # 初期値によるlambdaの近似事後分布を作図
 plt.figure(figsize=(12, 9))
 for k in range(K):
-    plt.vlines(x=lambda_truth_k[k], ymin=0.0, ymax=np.max(posterior_lambda_kl), 
-               color='red', linestyle='--') # 真の値
     plt.plot(lambda_line, posterior_lambda_kl[k], label='cluster:' + str(k + 1)) # 事後分布
+plt.vlines(x=lambda_truth_k, ymin=0.0, ymax=np.max(posterior_lambda_kl), 
+           color='red', linestyle='--', label='true val') # 真の値
 plt.xlabel('$\lambda$')
 plt.ylabel('density')
 plt.suptitle('Gamma Distribution', size=20)
@@ -166,7 +184,7 @@ for k in range(K):
     tmp_prob = poisson.pmf(k=x_line, mu=E_lambda_k[k])
     
     # K個の分布の加重平均を計算
-    init_prob += tmp_prob * E_pi_k[k]
+    init_prob += E_pi_k[k] * tmp_prob
 
 # 初期値による分布を作図
 plt.figure(figsize=(12, 9))
@@ -233,9 +251,6 @@ for i in range(MaxIter):
 
 ## パラメータの事後分布を確認
 
-# 作図用のlambdaの点を作成
-lambda_line = np.linspace(0, 2 * np.max(lambda_truth_k), num=1000)
-
 # lambdaの事後分布を計算
 posterior_lambda_kl = np.empty((K, len(lambda_line)))
 for k in range(K):
@@ -244,9 +259,9 @@ for k in range(K):
 # lambdaの事後分布を作図
 plt.figure(figsize=(12, 9))
 for k in range(K):
-    plt.vlines(x=lambda_truth_k[k], ymin=0.0, ymax=np.max(posterior_lambda_kl), 
-               color='red', linestyle='--') # 真の値
     plt.plot(lambda_line, posterior_lambda_kl[k], label='cluster:' + str(k + 1)) # 事後分布
+plt.vlines(x=lambda_truth_k, ymin=0.0, ymax=np.max(posterior_lambda_kl), 
+           color='red', linestyle='--', label='true val') # 真の値
 plt.xlabel('$\lambda$')
 plt.ylabel('density')
 plt.suptitle('Gamma Distribution', size=20)
@@ -271,7 +286,7 @@ for k in range(K):
     tmp_prob = poisson.pmf(k=x_line, mu=E_lambda_k[k])
     
     # K個の分布の加重平均を計算
-    res_prob += tmp_prob * E_pi_k[k]
+    res_prob += E_pi_k[k] * tmp_prob
 
 # 最後の推定値による分布を作図
 plt.figure(figsize=(12, 9))
@@ -312,10 +327,9 @@ color_list = ['red', 'green', 'blue']
 plt.figure(figsize=(12, 9))
 for k in range(K):
     plt.bar(x=x_line, height=[np.sum(x_n[s_truth_n == k] == x) for x in x_line], 
-            color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='true:' + str(k + 1)) # 真のクラスタ
+            color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='true cluster:' + str(k + 1)) # 真のクラスタ
 for k in range(K):
-    # k番目のグラフのカラーマップを設定
-    cm = plt.get_cmap(colormap_list[k])
+    cm = plt.get_cmap(colormap_list[k]) # クラスタkのカラーマップを設定
     plt.bar(x=x_line, height=[np.sum(x_n[s_n == k] == x) for x in x_line], 
             color=[cm(p) for p in E_s_line], alpha=1, label='cluster:' + str(k + 1)) # 最後のクラスタ
 plt.xlabel('x')
@@ -323,8 +337,7 @@ plt.ylabel('count')
 plt.suptitle('Poisson Mixture Model:Variational Inference', size=20)
 plt.title('$iter:' + str(MaxIter) + ', N=' + str(N) + 
           ', E[\lambda]=[' + ', '.join([str(lmd) for lmd in np.round(a_hat_k / b_hat_k, 2)]) + ']' + 
-          ', E[\pi]=[' + ', '.join([str(pi) for pi in np.round(alpha_hat_k / np.sum(alpha_hat_k), 2)]) + ']$', 
-          loc='left')
+          ', E[\pi]=[' + ', '.join([str(pi) for pi in np.round(alpha_hat_k / np.sum(alpha_hat_k), 2)]) + ']$', loc='left')
 plt.legend()
 plt.show()
 
@@ -401,12 +414,12 @@ def update_posterior(i):
     
     # i回目のlambdaの事後分布を作図
     for k in range(K):
-        plt.vlines(x=lambda_truth_k[k], ymin=0.0, ymax=np.max(posterior_lambda_k), 
-                   color='red', linestyle='--') # 真の値
         plt.plot(lambda_line, posterior_lambda_k[k], label='cluster:' + str(k + 1)) # 事後分布
+    plt.vlines(x=lambda_truth_k, ymin=0.0, ymax=np.max(posterior_lambda_k), 
+               color='red', linestyle='--', label='true val') # 真の値
     plt.xlabel('$\lambda$')
     plt.ylabel('density')
-    plt.suptitle('Variational Inference', size=20)
+    plt.suptitle('Gamma Distribution:Variational Inference', size=20)
     plt.title('$iter:' + str(i) + ', N=' + str(N) + 
               ', \hat{a}=[' + ', '.join([str(a) for a in np.round(trace_a_ik[i], 1)]) + ']' + 
               ', \hat{b}=[' + ', '.join([str(b) for b in np.round(trace_b_ik[i], 1)]) + ']$', loc='left')
@@ -439,7 +452,7 @@ def update_model(i):
         tmp_prob = poisson.pmf(k=x_line, mu=E_lambda_k[k])
         
         # K個の分布の加重平均を計算
-        res_prob += tmp_prob * E_pi_k[k]
+        res_prob += E_pi_k[k] * tmp_prob
     
     # i回目のサンプルによる分布を作図
     plt.bar(x=x_line, height=model_prob, label='true model', 
@@ -447,7 +460,7 @@ def update_model(i):
     plt.bar(x=x_line, height=res_prob, color='purple') # 推定値による分布
     plt.xlabel('x')
     plt.ylabel('prob')
-    plt.suptitle('Poisson Mixture Model:Gibbs Sampling', size = 20)
+    plt.suptitle('Poisson Mixture Model:Variational Inference', size = 20)
     plt.title('$iter:' + str(i) + ', N=' + str(N) + 
               ', E[\lambda]=[' + ', '.join([str(lmd) for lmd in np.round(E_lambda_k, 2)]) + ']' + 
               ', E[\pi]=[' + ', '.join([str(pi) for pi in np.round(E_pi_k, 2)]) + ']$', loc='left')
@@ -509,7 +522,7 @@ def update_cluster(i):
                 color=[cm(p) for p in E_s_line], alpha=1, label='cluster:' + str(k + 1)) # 推定したクラスタ
     plt.xlabel('x')
     plt.ylabel('count')
-    plt.suptitle('Poisson Mixture Model', size=20)
+    plt.suptitle('Poisson Mixture Model:Variational Inference', size=20)
     plt.title('$iter:' + str(i) + ', N=' + str(N) + 
               ', E[\lambda]=[' + ', '.join([str(lmd) for lmd in np.round(a_hat_k / b_hat_k, 2)]) + ']' + 
               ', E[\pi]=[' + ', '.join([str(pi) for pi in np.round(alpha_hat_k / np.sum(alpha_hat_k), 2)]) + ']$', loc='left')
@@ -518,45 +531,6 @@ def update_cluster(i):
 # gif画像を作成
 cluster_anime = animation.FuncAnimation(fig, update_cluster, frames=MaxIter + 1, interval=100)
 cluster_anime.save("ch4_3_3_Cluster.gif")
-
-
-#%%
-
-# 確率が最大のクラスタ番号を抽出
-s_n = np.argmax(E_s_nk, axis=1)
-
-
-# 作図用の潜在変数の事後分布の期待値を計算:式(4.59)
-E_s_lk = np.empty((len(x_line), K))
-for n in range(len(x_line)):
-    # 潜在変数の事後分布のパラメータを計算:式(4.51)
-    tmp_eta_k = np.exp(x_line[n] * E_ln_lmd_k - E_lmd_k + E_ln_pi_k)
-    E_s_lk[n] = tmp_eta_k / np.sum(tmp_eta_k) # 正規化
-
-# 作図用のxのクラスタとなる確率を抽出
-E_s_line = E_s_lk[np.arange(len(x_line)), np.argmax(E_s_lk, axis=1)]
-
-
-
-# 最後のクラスタのヒストグラムを作成
-plt.figure(figsize=(12, 9))
-for k in range(K):
-    plt.bar(x=x_line, height=[np.sum(x_n[s_truth_n == k] == x) for x in x_line], 
-            color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='true:' + str(k + 1)) # 真のクラスタ
-for k in range(K):
-    # k番目のグラフのカラーマップを設定
-    cm = plt.get_cmap(colormap_list[k])
-    plt.bar(x=x_line, height=[np.sum(x_n[s_n == k] == x) for x in x_line], 
-            color=[cm(p) for p in E_s_line], alpha=1, label='cluster:' + str(k + 1)) # 最後のクラスタ
-plt.xlabel('x')
-plt.ylabel('count')
-plt.suptitle('Poisson Mixture Model:Variational Inference', size=20)
-plt.title('$iter:' + str(MaxIter) + ', N=' + str(N) + 
-          ', E[\lambda]=[' + ', '.join([str(lmd) for lmd in np.round(a_hat_k / b_hat_k, 2)]) + ']' + 
-          ', E[\pi]=[' + ', '.join([str(pi) for pi in np.round(alpha_hat_k / np.sum(alpha_hat_k), 2)]) + ']$', 
-          loc='left')
-plt.legend()
-plt.show()
 
 
 #%%
