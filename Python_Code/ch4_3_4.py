@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 ## 観測モデル(ポアソン混合分布)の設定
 
-# 真のパラメータを指定
-lambda_truth_k  = np.array([10, 25, 40])
+# K個の真のパラメータを指定
+lambda_truth_k  = np.array([10.0, 25.0, 40.0])
 
 # 真の混合比率を指定
 pi_truth_k = np.array([0.35, 0.25, 0.4])
@@ -32,7 +32,7 @@ for k in range(K):
     tmp_prob = poisson.pmf(k=x_line, mu=lambda_truth_k[k])
     
     # K個の分布の加重平均を計算
-    model_prob += tmp_prob * pi_truth_k[k]
+    model_prob += pi_truth_k[k] * tmp_prob
 
 #%%
 
@@ -107,6 +107,27 @@ b = 1.0
 # piの事前分布のパラメータを指定
 alpha_k = np.repeat(2.0, K)
 
+
+# 作図用のlambdaの点を作成
+lambda_line = np.linspace(0.0, 2.0 * np.max(lambda_truth_k), num=1000)
+
+#%%
+
+# lambdaの事前分布を計算
+prior_lambda = gamma.pdf(x=lambda_line, a=a, scale=1 / b)
+
+# lambdaの事前分布を作図
+plt.figure(figsize=(12, 9))
+plt.plot(lambda_line, prior_lambda, label='prior', color='purple') # 事前分布
+plt.vlines(x=lambda_truth_k, ymin=0.0, ymax=np.max(prior_lambda), label='true val', 
+           color='red', linestyle='--') # 真の値
+plt.xlabel('$\lambda$')
+plt.ylabel('density')
+plt.suptitle('Gamma Distribution', fontsize=20)
+plt.title('a=' + str(a) + ', b=' + str(b), loc='left')
+plt.legend()
+plt.show()
+
 #%%
 
 ## 初期値の設定
@@ -127,9 +148,6 @@ print(alpha_hat_k)
 
 #%%
 
-# 作図用のlambdaの点を作成
-lambda_line = np.linspace(0, 2 * np.max(lambda_truth_k), num=1000)
-
 # 初期値によるlambdaの近似事後分布を作図
 posterior_lambda_kl = np.empty((K, len(lambda_line)))
 for k in range(K):
@@ -138,9 +156,9 @@ for k in range(K):
 # 初期値によるlambdaの近似事後分布を作図
 plt.figure(figsize=(12, 9))
 for k in range(K):
-    plt.vlines(x=lambda_truth_k[k], ymin=0.0, ymax=np.max(posterior_lambda_kl), 
-               color='red', linestyle='--') # 真の値
     plt.plot(lambda_line, posterior_lambda_kl[k], label='cluster:' + str(k + 1)) # 事後分布
+plt.vlines(x=lambda_truth_k, ymin=0.0, ymax=np.max(posterior_lambda_kl), 
+           color='red', linestyle='--', label='true val') # 真の値
 plt.xlabel('$\lambda$')
 plt.ylabel('density')
 plt.suptitle('Gamma Distribution', size=20)
@@ -165,7 +183,7 @@ for k in range(K):
     tmp_prob = poisson.pmf(k=x_line, mu=E_lambda_k[k])
     
     # K個の分布の加重平均を計算
-    init_prob += tmp_prob * E_pi_k[k]
+    init_prob += E_pi_k[k] * tmp_prob
 
 # 初期値による分布を作図
 plt.figure(figsize=(12, 9))
@@ -246,9 +264,6 @@ for i in range(MaxIter):
 
 ## パラメータの事後分布を確認
 
-# 作図用のlambdaの点を作成
-lambda_line = np.linspace(0, 2 * np.max(lambda_truth_k), num=1000)
-
 # lambdaの事後分布を計算
 posterior_lambda_kl = np.empty((K, len(lambda_line)))
 for k in range(K):
@@ -257,9 +272,9 @@ for k in range(K):
 # lambdaの事後分布を作図
 plt.figure(figsize=(12, 9))
 for k in range(K):
-    plt.vlines(x=lambda_truth_k[k], ymin=0.0, ymax=np.max(posterior_lambda_kl), 
-               color='red', linestyle='--') # 真の値
     plt.plot(lambda_line, posterior_lambda_kl[k], label='cluster:' + str(k + 1)) # 事後分布
+plt.vlines(x=lambda_truth_k, ymin=0.0, ymax=np.max(posterior_lambda_kl), 
+           color='red', linestyle='--', label='true val') # 真の値
 plt.xlabel('$\lambda$')
 plt.ylabel('density')
 plt.suptitle('Gamma Distribution:Collapsed Gibbs Sampling', size=20)
@@ -284,7 +299,7 @@ for k in range(K):
     tmp_prob = poisson.pmf(k=x_line, mu=E_lambda_k[k])
     
     # K個の分布の加重平均を計算
-    res_prob += tmp_prob * E_pi_k[k]
+    res_prob += E_pi_k[k] * tmp_prob
 
 # 最後の推定値による分布を作図
 plt.figure(figsize=(12, 9))
@@ -309,7 +324,7 @@ color_list = ['red', 'green', 'blue']
 plt.figure(figsize=(12, 9))
 for k in range(K):
     plt.bar(x=x_line, height=[np.sum(x_n[s_truth_n == k] == x) for x in x_line], 
-            color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='cluster:' + str(k + 1)) # 真のクラスタ
+            color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='true cluster:' + str(k + 1)) # 真のクラスタ
 for k in range(K):
     plt.bar(x=x_line, height=[np.sum(x_n[s_n == k] == x) for x in x_line], 
             alpha=0.5, label='cluster:' + str(k + 1)) # 最後のクラスタ
@@ -378,7 +393,7 @@ import matplotlib.animation as animation
 ## 事後分布の推移の確認
 
 # 作図用のlambdaの点を作成
-lambda_line = np.linspace(0, 2 * np.max(lambda_truth_k), num=1000)
+lambda_line = np.linspace(0.0, 2.0 * np.max(lambda_truth_k), num=1000)
 
 # 画像サイズを指定
 fig = plt.figure(figsize=(12, 9))
@@ -400,11 +415,12 @@ def update_posterior(i):
         plt.plot(lambda_line, posterior_lambda_k[k], label='cluster:' + str(k + 1)) # 事後分布
     plt.xlabel('$\lambda$')
     plt.ylabel('density')
-    plt.suptitle('Variational Inference', size=20)
+    plt.suptitle('Gamma Distribution:Collapsed Gibbs Sampling', size=20)
     plt.title('$iter:' + str(i) + ', N=' + str(N) + 
               ', \hat{a}=[' + ', '.join([str(a) for a in trace_a_ik[i]]) + ']' + 
               ', \hat{b}=[' + ', '.join([str(b) for b in trace_b_ik[i]]) + ']$', loc='left')
     plt.legend()
+    plt.grid()
 
 # gif画像を作成
 posterior_anime = animation.FuncAnimation(fig, update_posterior, frames=MaxIter + 1, interval=100)
@@ -433,7 +449,7 @@ def update_model(i):
         tmp_prob = poisson.pmf(k=x_line, mu=E_lambda_k[k])
         
         # K個の分布の加重平均を計算
-        res_prob += tmp_prob * E_pi_k[k]
+        res_prob += E_pi_k[k] * tmp_prob
     
     # i回目のサンプルによる分布を作図
     plt.bar(x=x_line, height=model_prob, label='true model', 
@@ -441,12 +457,13 @@ def update_model(i):
     plt.bar(x=x_line, height=res_prob, color='purple') # 推定値による分布
     plt.xlabel('x')
     plt.ylabel('prob')
-    plt.suptitle('Poisson Mixture Model:Gibbs Sampling', size = 20)
+    plt.suptitle('Poisson Mixture Model:Collapsed Gibbs Sampling', size = 20)
     plt.title('$iter:' + str(i) + ', N=' + str(N) + 
               ', E[\lambda]=[' + ', '.join([str(lmd) for lmd in np.round(E_lambda_k, 2)]) + ']' + 
               ', E[\pi]=[' + ', '.join([str(pi) for pi in np.round(E_pi_k, 2)]) + ']$', loc='left')
     plt.ylim(0.0, 0.1)
     plt.legend()
+    plt.grid()
 
 # gif画像を作成
 model_anime = animation.FuncAnimation(fig, update_model, frames=MaxIter + 1, interval=100)
@@ -471,7 +488,7 @@ def update_cluster(i):
     # i回目のクラスタの散布図を作成
     for k in range(K):
         plt.bar(x=x_line, height=[np.sum(x_n[s_truth_n == k] == x) for x in x_line], 
-                color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='true:' + str(k + 1)) # 真のクラスタ
+                color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='true cluster:' + str(k + 1)) # 真のクラスタ
     for k in range(K):
         plt.bar(x=x_line, height=[np.sum(x_n[np.array(trace_s_in[i]) == k] == x) for x in x_line], 
                 alpha=0.5, label='cluster:' + str(k + 1)) # サンプルしたクラスタ
@@ -482,6 +499,7 @@ def update_cluster(i):
               ', \lambda=[' + ', '.join([str(lmd) for lmd in np.round(np.array(trace_a_ik[i]) / np.array(trace_b_ik[i]), 2)]) + ']' + 
               ', \pi=[' + ', '.join([str(pi) for pi in np.round(np.array(trace_alpha_ik[i]) / np.sum(trace_alpha_ik [i]), 2)]) + ']$', loc='left')
     plt.legend()
+    plt.grid()
 
 # gif画像を作成
 cluster_anime = animation.FuncAnimation(fig, update_cluster, frames=MaxIter + 1, interval=100)
