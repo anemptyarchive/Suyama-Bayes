@@ -11,36 +11,56 @@ import matplotlib.pyplot as plt
 
 ## 尤度(ガウス分布)の設定
 
-# 真のパラメータを指定
+# 真の平均パラメータを指定
 mu_truth_d = np.array([25.0, 50.0])
-sigma_dd = np.array([[15.0, 10.0], [10.0, 20.0]])
-lambda_dd = np.linalg.inv(sigma_dd**2)
+
+# (既知の)分散共分散行列を指定
+sigma2_dd = np.array([[600.0, -100.0], [-100.0, 400.0]])
+
+# (既知の精度)行列を計算
+lambda_dd = np.linalg.inv(sigma2_dd)
 print(lambda_dd)
 
-# 作図用のxの点を作成
-x_1_point = np.linspace(mu_truth_d[0] - 4 * sigma_dd[0, 0], mu_truth_d[0] + 4 * sigma_dd[0, 0], num=1000)
-x_2_point = np.linspace(mu_truth_d[1] - 4 * sigma_dd[1, 1], mu_truth_d[1] + 4 * sigma_dd[1, 1], num=1000)
-x_1_grid, x_2_grid = np.meshgrid(x_1_point, x_2_point)
-x_point_arr = np.stack([x_1_grid.flatten(), x_2_grid.flatten()], axis=1)
-x_dims = x_1_grid.shape
+
+# 作図用のxのx軸の値を作成
+x_0_line = np.linspace(
+    mu_truth_d[0] - 3 * np.sqrt(sigma2_dd[0, 0]), 
+    mu_truth_d[0] + 3 * np.sqrt(sigma2_dd[0, 0]), 
+    num=500
+)
+
+# 作図用のxのx軸の値を作成
+x_1_line = np.linspace(
+    mu_truth_d[1] - 3 * np.sqrt(sigma2_dd[1, 1]), 
+    mu_truth_d[1] + 3 * np.sqrt(sigma2_dd[1, 1]), 
+    num=500
+)
+
+# 格子状のxの値を作成
+x_0_grid, x_1_grid = np.meshgrid(x_0_line, x_1_line)
+
+# xの点を作成
+x_point_arr = np.stack([x_0_grid.flatten(), x_1_grid.flatten()], axis=1)
+x_dims = x_0_grid.shape
 print(x_dims)
+
 
 # 尤度を計算:式(2.72)
 true_model = multivariate_normal.pdf(
     x=x_point_arr, mean=mu_truth_d, cov=np.linalg.inv(lambda_dd)
 )
-print(true_model)
 
 #%%
 
 # 尤度を作図
 plt.figure(figsize=(12, 9))
-plt.contour(x_1_grid, x_2_grid, true_model.reshape(x_dims)) # 尤度
+plt.contour(x_0_grid, x_1_grid, true_model.reshape(x_dims)) # 尤度
 plt.xlabel('$x_1$')
 plt.ylabel('$x_2$')
 plt.suptitle('Multivariate Gaussian Distribution', fontsize=20)
 plt.title('$\mu=[' + ', '.join([str(mu) for mu in mu_truth_d]) + ']' + 
-          ', \Lambda=' + str([list(lmd_d) for lmd_d in np.round(lambda_dd, 5)]) + '$', loc='left')
+          ', \Lambda=' + str([list(lmd_d) for lmd_d in np.round(lambda_dd, 5)]) + '$', 
+          loc='left')
 plt.colorbar()
 plt.show()
 
@@ -62,13 +82,13 @@ print(x_nd[:5])
 # 観測データの散布図を作成
 plt.figure(figsize=(12, 9))
 plt.scatter(x=x_nd[:, 0], y=x_nd[:, 1]) # 観測データ
-plt.contour(x_1_grid, x_2_grid, true_model.reshape(x_dims)) # 尤度
+plt.contour(x_0_grid, x_1_grid, true_model.reshape(x_dims)) # 真の分布
 plt.xlabel('$x_1$')
 plt.ylabel('$x_2$')
 plt.suptitle('Multivariate Gaussian Distribution', fontsize=20)
 plt.title('$N=' + str(N) + ', \mu=[' + ', '.join([str(mu) for mu in mu_truth_d]) + ']' + 
-          ', \Sigma=' + str([list(lmd_d) for lmd_d in np.round(np.sqrt(np.linalg.inv(lambda_dd)), 1)]) + 
-          '$', loc='left')
+          ', \Lambda=' + str([list(lmd_d) for lmd_d in np.round(lambda_dd, 5)]) + '$', 
+          loc='left')
 plt.colorbar()
 plt.show()
 
@@ -76,38 +96,57 @@ plt.show()
 
 ## 事前分布(多次元ガウス分布)の設定
 
-# muの事前分布のパラメータを指定
+# muの事前分布の平均パラメータを指定
 m_d = np.array([0.0, 0.0])
-sigma_mu_dd = np.array([[100.0, 0.0], [0.0, 100.0]])
-lambda_mu_dd = np.linalg.inv(sigma_mu_dd**2)
+
+# muの事前分布の分散共分散行列を指定
+sigma2_mu_dd = np.array([[1000.0, 0.0], [0.0, 1000.0]])
+
+# muの事前分布の精度行列を計算
+lambda_mu_dd = np.linalg.inv(sigma2_mu_dd)
 print(lambda_mu_dd)
 
-# 作図用のmuの点を作成
-mu_1_point = np.linspace(mu_truth_d[0] - 100.0, mu_truth_d[0] + 100.0, num=1000)
-mu_2_point = np.linspace(mu_truth_d[1] - 100.0, mu_truth_d[1] + 100.0, num=1000)
-mu_1_grid, mu_2_grid = np.meshgrid(mu_1_point, mu_2_point)
-mu_point_arr = np.stack([mu_1_grid.flatten(), mu_2_grid.flatten()], axis=1)
-mu_dims = mu_1_grid.shape
+
+# 作図用のmuのx軸の値を作成
+mu_0_line = np.linspace(
+    mu_truth_d[0] - 2 *  np.sqrt(sigma2_mu_dd[0, 0]), 
+    mu_truth_d[0] + 2 *  np.sqrt(sigma2_mu_dd[0, 0]), 
+    num=500
+)
+
+# 作図用のmuのy軸の値を作成
+mu_1_line = np.linspace(
+    mu_truth_d[1] - 2 *  np.sqrt(sigma2_mu_dd[1, 1]), 
+    mu_truth_d[1] + 2 *  np.sqrt(sigma2_mu_dd[1, 1]), 
+    num=500
+)
+
+# 格子状の点を作成
+mu_0_grid, mu_1_grid = np.meshgrid(mu_0_line, mu_1_line)
+
+# muの点を作成
+mu_point_arr = np.stack([mu_0_grid.flatten(), mu_1_grid.flatten()], axis=1)
+mu_dims = mu_0_grid.shape
 print(mu_dims)
+
 
 # muの事前分布を計算:式(2.72)
 prior = multivariate_normal.pdf(
     x=mu_point_arr, mean=m_d, cov=np.linalg.inv(lambda_mu_dd)
 )
-print(prior)
 
 #%%
 
 # muの事前分布を作図
 plt.figure(figsize=(12, 9))
-plt.contour(mu_1_grid, mu_2_grid, prior.reshape(mu_dims)) # muの事前分布
-plt.scatter(x=mu_truth_d[0], y=mu_truth_d[1], color='red', s=100, marker='x') # 真のmu
+plt.scatter(x=mu_truth_d[0], y=mu_truth_d[1], color='red', s=100, marker='x') # 真の値
+plt.contour(mu_0_grid, mu_1_grid, prior.reshape(mu_dims)) # muの事前分布
 plt.xlabel('$\mu_1$')
 plt.ylabel('$\mu_2$')
 plt.suptitle('Multivariate Gaussian Distribution', fontsize=20)
 plt.title('$m=[' + ', '.join([str(m) for m in m_d]) + ']' + 
-          ', \Lambda_{\mu}=' + str([list(lmd_d) for lmd_d in np.round(lambda_mu_dd, 5)]) + 
-          '$', loc='left')
+          ', \Lambda_{\mu}=' + str([list(lmd_d) for lmd_d in np.round(lambda_mu_dd, 5)]) + '$', 
+          loc='left')
 plt.colorbar()
 plt.show()
 
@@ -120,29 +159,25 @@ lambda_mu_hat_dd = N * lambda_dd + lambda_mu_dd
 term_x_d = np.dot(lambda_dd, np.sum(x_nd, axis=0))
 term_m_d = np.dot(lambda_mu_dd, m_d)
 m_hat_d = np.dot(np.linalg.inv(lambda_mu_hat_dd), (term_x_d + term_m_d))
-print(lambda_mu_dd)
-print(m_hat_d)
 
 # muの事後分布を計算:式(2.72)
 posterior = multivariate_normal.pdf(
     x=mu_point_arr, mean=m_hat_d, cov=np.linalg.inv(lambda_mu_hat_dd)
 )
-print(posterior)
 
 #%%
 
 # muの事後分布を作図
 plt.figure(figsize=(12, 9))
-plt.contour(mu_1_grid, mu_2_grid, posterior.reshape(mu_dims)) # muの事後分布
-plt.scatter(x=mu_truth_d[0], y=mu_truth_d[1], color='red', s=100, marker='x') # 真のmu
+plt.scatter(x=mu_truth_d[0], y=mu_truth_d[1], color='red', s=100, marker='x') # 真の値
+plt.contour(mu_0_grid, mu_1_grid, posterior.reshape(mu_dims)) # muの事後分布
 plt.xlabel('$\mu_1$')
 plt.ylabel('$\mu_2$')
 plt.suptitle('Multivariate Gaussian Distribution', fontsize=20)
-plt.title('$N=' + str(N) + ', \hat{m}=[' + ', '.join([str(m) for m in np.round(m_hat_d, 1)]) + ']' + 
-          ', \hat{\Lambda}_{\mu}=' + str([list(lmd_d) for lmd_d in np.round(lambda_mu_hat_dd, 5)]) + 
-          '$', loc='left')
-#plt.xlim((mu_truth_d[0] - 0.5 * sigma_dd[0, 0], mu_truth_d[0] + 0.5 * sigma_dd[0, 0]))
-#plt.ylim((mu_truth_d[1] - 0.5 * sigma_dd[1, 1], mu_truth_d[1] + 0.5 * sigma_dd[1, 1]))
+plt.title('$N=' + str(N) + 
+          ', \hat{m}=[' + ', '.join([str(m) for m in np.round(m_hat_d, 1)]) + ']' + 
+          ', \hat{\Lambda}_{\mu}=' + str([list(lmd_d) for lmd_d in np.round(lambda_mu_hat_dd, 5)]) + '$', 
+          loc='left')
 plt.colorbar()
 plt.show()
 
@@ -155,39 +190,37 @@ lambda_star_hat_dd = np.linalg.inv(
     np.linalg.inv(lambda_dd) + np.linalg.inv(lambda_mu_hat_dd)
 )
 mu_star_hat_d = m_hat_d
-print(lambda_star_hat_dd)
-print(mu_star_hat_d)
 
 # 予測分布を計算:式(2.72)
 predict = multivariate_normal.pdf(
     x=x_point_arr, mean=mu_star_hat_d, cov=np.linalg.inv(lambda_star_hat_dd)
 )
-print(predict)
 
 #%%
 
 # 予測分布を作図
 plt.figure(figsize=(12, 9))
-plt.contour(x_1_grid, x_2_grid, predict.reshape(x_dims)) # 予測分布
-plt.contour(x_1_grid, x_2_grid, true_model.reshape(x_dims), 
+plt.contour(x_0_grid, x_1_grid, true_model.reshape(x_dims), 
             alpha=0.5, linestyles='--') # 真の分布
 plt.scatter(x=mu_truth_d[0], y=mu_truth_d[1], color='red', s=100, marker='x') # 真のmu
-#plt.scatter(x=x_nd[:, 0], y=x_nd[:, 1]) # 観測データ
+plt.scatter(x=x_nd[:, 0], y=x_nd[:, 1]) # 観測データ
+plt.contour(x_0_grid, x_1_grid, predict.reshape(x_dims)) # 予測分布
 plt.xlabel('$x_1$')
 plt.ylabel('$x_2$')
 plt.suptitle('Multivariate Gaussian Distribution', fontsize=20)
-plt.title('$N=' + str(N) + ', \hat{\mu}_{*}=[' + ', '.join([str(mu) for mu in np.round(mu_star_hat_d, 1)]) + ']' + 
-          ', \hat{\Lambda}_{*}=' + str([list(lmd_d) for lmd_d in np.round(lambda_star_hat_dd, 5)]) + 
-          '$', loc='left')
+plt.title('$N=' + str(N) + 
+          ', \hat{\mu}_{*}=[' + ', '.join([str(mu) for mu in np.round(mu_star_hat_d, 1)]) + ']' + 
+          ', \hat{\Lambda}_{*}=' + str([list(lmd_d) for lmd_d in np.round(lambda_star_hat_dd, 5)]) + '$', 
+          loc='left')
 plt.colorbar()
 plt.show()
 
 
 #%%
 
-### ・アニメーション
+### ・アニメーションによる推移の確認
 
-# 利用するライブラリ
+# 3.4.1項で利用するライブラリ
 import numpy as np
 from scipy.stats import multivariate_normal # 多次元ガウス分布
 import matplotlib.pyplot as plt
@@ -195,17 +228,27 @@ import matplotlib.animation as animation
 
 #%%
 
-## 推論処理
+## モデルの設定
 
-# 真のパラメータを指定
+# 真の平均パラメータを指定
 mu_truth_d = np.array([25.0, 50.0])
-sigma_dd = np.array([[15.0, 10.0], [10.0, 20.0]])
-lambda_dd = np.linalg.inv(sigma_dd**2)
 
-# muの事前分布のパラメータを指定
+# (既知の)分散共分散行列を指定
+sigma2_dd = np.array([[600.0, 100.0], [100.0, 400.0]])
+
+# (既知の精度)行列を計算
+lambda_dd = np.linalg.inv(sigma2_dd)
+
+
+# muの事前分布の平均パラメータを指定
 m_d = np.array([0.0, 0.0])
-sigma_mu_dd = np.array([[100.0, 0.0], [0.0, 100.0]])
-lambda_mu_dd = np.linalg.inv(sigma_mu_dd**2)
+
+# muの事前分布の分散共分散行列を指定
+sigma2_mu_dd = np.array([[1000.0, 0.0], [0.0, 1000.0]])
+
+# muの事前分布の精度行列を計算
+lambda_mu_dd = np.linalg.inv(sigma2_mu_dd)
+
 
 # 初期値による予測分布のパラメータを計算:式(3.109),(3.110)
 lambda_star_dd = np.linalg.inv(
@@ -213,34 +256,70 @@ lambda_star_dd = np.linalg.inv(
 )
 mu_star_d = m_d
 
+
+# 作図用のmuのx軸の値を作成
+mu_0_line = np.linspace(
+    mu_truth_d[0] - 2 *  np.sqrt(sigma2_mu_dd[0, 0]), 
+    mu_truth_d[0] + 2 *  np.sqrt(sigma2_mu_dd[0, 0]), 
+    num=500
+)
+
+# 作図用のmuのy軸の値を作成
+mu_1_line = np.linspace(
+    mu_truth_d[1] - 2 *  np.sqrt(sigma2_mu_dd[1, 1]), 
+    mu_truth_d[1] + 2 *  np.sqrt(sigma2_mu_dd[1, 1]), 
+    num=500
+)
+
+# 格子状の点を作成
+mu_0_grid, mu_1_grid = np.meshgrid(mu_0_line, mu_1_line)
+
+# muの点を作成
+mu_point_arr = np.stack([mu_0_grid.flatten(), mu_1_grid.flatten()], axis=1)
+mu_dims = mu_0_grid.shape
+
+
+# 作図用のxのx軸の値を作成
+x_0_line = np.linspace(
+    mu_truth_d[0] - 3 * np.sqrt(sigma2_dd[0, 0]), 
+    mu_truth_d[0] + 3 * np.sqrt(sigma2_dd[0, 0]), 
+    num=500
+)
+
+# 作図用のxのx軸の値を作成
+x_1_line = np.linspace(
+    mu_truth_d[1] - 3 * np.sqrt(sigma2_dd[1, 1]), 
+    mu_truth_d[1] + 3 * np.sqrt(sigma2_dd[1, 1]), 
+    num=500
+)
+
+# 格子状のxの値を作成
+x_0_grid, x_1_grid = np.meshgrid(x_0_line, x_1_line)
+
+# xの点を作成
+x_point_arr = np.stack([x_0_grid.flatten(), x_1_grid.flatten()], axis=1)
+x_dims = x_0_grid.shape
+
+#%%
+
+## 推論処理
+
 # データ数(試行回数)を指定
 N = 100
 
-# 作図用のmuの点を作成
-mu_1_point = np.linspace(mu_truth_d[0] - 100.0, mu_truth_d[0] + 100.0, num=1000)
-mu_2_point = np.linspace(mu_truth_d[1] - 100.0, mu_truth_d[1] + 100.0, num=1000)
-mu_1_grid, mu_2_grid = np.meshgrid(mu_1_point, mu_2_point)
-mu_point_arr = np.stack([mu_1_grid.flatten(), mu_2_grid.flatten()], axis=1)
-mu_dims = mu_1_grid.shape
-
-# 作図用のxの点を作成
-x_1_point = np.linspace(mu_truth_d[0] - 4 * sigma_dd[0, 0], mu_truth_d[0] + 4 * sigma_dd[0, 0], num=1000)
-x_2_point = np.linspace(mu_truth_d[1] - 4 * sigma_dd[1, 1], mu_truth_d[1] + 4 * sigma_dd[1, 1], num=1000)
-x_1_grid, x_2_grid = np.meshgrid(x_1_point, x_2_point)
-x_point_arr = np.stack([x_1_grid.flatten(), x_2_grid.flatten()], axis=1)
-x_dims = x_1_grid.shape
+# 観測データの受け皿を作成
+x_nd = np.empty((N, 2))
 
 # 推移の記録用の受け皿を初期化
-x_nd = np.empty((N, 2))
-trace_m = [list(m_d)]
-trace_lambda_mu = [[list(lmd_d) for lmd_d in lambda_mu_dd]]
+trace_m = [m_d]
+trace_lambda_mu = [lambda_mu_dd]
 trace_posterior = [
     multivariate_normal.pdf(
         x=mu_point_arr, mean=m_d, cov=np.linalg.inv(lambda_mu_dd)
     )
 ]
-trace_mu_star = [list(mu_star_d)]
-trace_lambda_star = [[list(lmd_d) for lmd_d in lambda_star_dd]]
+trace_mu_star = [mu_star_d]
+trace_lambda_star = [lambda_star_dd]
 trace_predict = [
     multivariate_normal.pdf(
         x=x_point_arr, mean=mu_star_d, cov=np.linalg.inv(lambda_star_dd)
@@ -280,43 +359,41 @@ for n in range(N):
         )
     )
     
-    # 超パラメータを記録
-    trace_m.append(list(m_d))
-    trace_lambda_mu.append([list(lmd_d) for lmd_d in lambda_mu_dd])
-    trace_mu_star.append(list(mu_star_d))
-    trace_lambda_star.append([list(lmd_d) for lmd_d in lambda_star_dd])
+    # n回目の結果を記録
+    trace_m.append(m_d)
+    trace_lambda_mu.append(lambda_mu_dd)
+    trace_mu_star.append(mu_star_d)
+    trace_lambda_star.append(lambda_star_dd)
     
     # 動作確認
     print('n=' + str(n + 1) + ' (' + str(np.round((n + 1) / N * 100, 1)) + '%)')
-
-# 観測データを確認
-print(x_nd[:5])
 
 #%%
 
 ## muの事後分布の推移をgif画像化
 
 # 画像サイズを指定
-fig = plt.figure(figsize=(10, 7.5))
+fig = plt.figure(figsize=(9, 9))
 
 # 作図処理を関数として定義
-def update_posterior_mu(n):
+def update_posterior(n):
     # 前フレームのグラフを初期化
     plt.cla()
     
     # nフレーム目のmuの事後分布を作図
-    plt.contour(mu_1_grid, mu_2_grid, np.array(trace_posterior[n]).reshape(mu_dims)) # muの事後分布
-    plt.scatter(x=mu_truth_d[0], y=mu_truth_d[1], color='red', s=100, marker='x') # 真のmu
+    plt.scatter(x=mu_truth_d[0], y=mu_truth_d[1], 
+                color='red', s=100, marker='x') # 真の値
+    plt.contour(mu_0_grid, mu_1_grid, trace_posterior[n].reshape(mu_dims)) # muの事後分布
     plt.xlabel('$\mu_1$')
     plt.ylabel('$\mu_2$')
     plt.suptitle('Multivariate Gaussian Distribution', fontsize=20)
-    plt.title('$n=' + str(n) + 
+    plt.title('$N=' + str(n) + 
               ', \hat{m}=[' + ', '.join([str(m) for m in np.round(trace_m[n], 1)]) + ']' + 
-              ', \hat{\Lambda}_{\mu}=' + str([list(lmd_d) for lmd_d in np.round(trace_lambda_mu[n], 5)]) + 
-              '$', loc='left')
+              ', \hat{\Lambda}_{\mu}=' + str([list(lmd_d) for lmd_d in np.round(trace_lambda_mu[n], 5)]) + '$', 
+              loc='left')
 
 # gif画像を作成
-posterior_anime = animation.FuncAnimation(fig, update_posterior_mu, frames=N + 1, interval=100)
+posterior_anime = animation.FuncAnimation(fig, update_posterior, frames=N + 1, interval=100)
 posterior_anime.save("ch3_4_1_Posterior.gif")
 
 #%%
@@ -329,7 +406,7 @@ true_model = multivariate_normal.pdf(
 )
 
 # 画像サイズを指定
-fig = plt.figure(figsize=(10, 7.5))
+fig = plt.figure(figsize=(9, 9))
 
 # 作図処理を関数として定義
 def update_predict(n):
@@ -337,17 +414,19 @@ def update_predict(n):
     plt.cla()
     
     # nフレーム目の予測分布を作図
-    plt.contour(x_1_grid, x_2_grid, np.array(trace_predict[n]).reshape(x_dims)) # 予測分布
-    plt.contour(x_1_grid, x_2_grid, true_model.reshape(x_dims), alpha=0.5, linestyles='--') # 真の分布
+    plt.contour(x_0_grid, x_1_grid, true_model.reshape(x_dims), 
+                alpha=0.5, linestyles='--') # 真の分布
+    plt.scatter(x=mu_truth_d[0], y=mu_truth_d[1], 
+                color='red', s=100, marker='x') # 真のmu
     plt.scatter(x=x_nd[:n, 0], y=x_nd[:n, 1]) # 観測データ
-    plt.scatter(x=mu_truth_d[0], y=mu_truth_d[1], color='red', s=100, marker='x') # 真のmu
+    plt.contour(x_0_grid, x_１_grid, trace_predict[n].reshape(x_dims)) # 予測分布
     plt.xlabel('$x_1$')
     plt.ylabel('$x_2$')
     plt.suptitle('Multivariate Gaussian Distribution', fontsize=20)
     plt.title('$N=' + str(n) + 
               ', \hat{\mu}_{*}=[' + ', '.join([str(mu) for mu in np.round(trace_mu_star[n], 1)]) + ']' + 
-              ', \hat{\Lambda}_{*}=' + str([list(lmd_d) for lmd_d in np.round(trace_lambda_star[n], 5)]) + 
-              '$', loc='left')
+              ', \hat{\Lambda}_{*}=' + str([list(lmd_d) for lmd_d in np.round(trace_lambda_star[n], 5)]) + '$', 
+              loc='left')
 
 # gif画像を作成
 predict_anime = animation.FuncAnimation(fig, update_predict, frames=N + 1, interval=100)

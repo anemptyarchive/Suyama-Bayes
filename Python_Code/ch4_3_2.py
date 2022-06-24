@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 ## 観測モデル(ポアソン混合分布)の設定
 
-# 真のパラメータを指定
-lambda_truth_k  = np.array([10, 25, 40])
+# K個の真のパラメータを指定
+lambda_truth_k  = np.array([10.0, 25.0, 40.0])
 
 # 真の混合比率を指定
 pi_truth_k = np.array([0.35, 0.25, 0.4])
@@ -32,7 +32,7 @@ for k in range(K):
     tmp_prob = poisson.pmf(k=x_line, mu=lambda_truth_k[k])
     
     # K個の分布の加重平均を計算
-    model_prob += tmp_prob * pi_truth_k[k]
+    model_prob += pi_truth_k[k] * tmp_prob
 
 #%%
 
@@ -73,7 +73,7 @@ plt.bar(x=x_line, height=model_prob, label='true model',
 plt.bar(x=x_line, height=[np.sum(x_n == x) / len(x_n) for x in x_line], label='observation data') # 観測データ
 plt.xlabel('x')
 plt.ylabel('dens')
-plt.suptitle('Poisson Mixture Model', size=20)
+plt.suptitle('Poisson Mixture Model', fontsize=20)
 plt.title('$N=' + str(N) + 
           ', \lambda=[' + ', '.join([str(lmd) for lmd in lambda_truth_k]) + ']' + 
           ', \pi=[' + ', '.join([str(pi) for pi in pi_truth_k]) + ']$', loc='left')
@@ -89,7 +89,7 @@ for k in range(K):
             alpha=0.5, label='cluster:' + str(k + 1)) # 真のクラスタ
 plt.xlabel('x')
 plt.ylabel('count')
-plt.suptitle('Poisson Mixture Model', size=20)
+plt.suptitle('Poisson Mixture Model', fontsize=20)
 plt.title('$N=' + str(N) + 
           ', \lambda=[' + ', '.join([str(lmd) for lmd in lambda_truth_k]) + ']' + 
           ', \pi=[' + ', '.join([str(pi) for pi in pi_truth_k]) + ']$', loc='left')
@@ -106,6 +106,27 @@ b = 1.0
 
 # piの事前分布のパラメータを指定
 alpha_k = np.repeat(2.0, K)
+
+
+# 作図用のlambdaの点を作成
+lambda_line = np.linspace(0.0, 2.0 * np.max(lambda_truth_k), num=1000)
+
+#%%
+
+# lambdaの事前分布を計算
+prior_lambda = gamma.pdf(x=lambda_line, a=a, scale=1 / b)
+
+# lambdaの事前分布を作図
+plt.figure(figsize=(12, 9))
+plt.plot(lambda_line, prior_lambda, label='prior', color='purple') # 事前分布
+plt.vlines(x=lambda_truth_k, ymin=0.0, ymax=np.max(prior_lambda), label='true val', 
+           color='red', linestyle='--') # 真の値
+plt.xlabel('$\lambda$')
+plt.ylabel('density')
+plt.suptitle('Gamma Distribution', fontsize=20)
+plt.title('a=' + str(a) + ', b=' + str(b), loc='left')
+plt.legend()
+plt.show()
 
 #%%
 
@@ -132,13 +153,16 @@ for k in range(K):
 
 # 初期値による分布を作図
 plt.figure(figsize=(12, 9))
-plt.bar(x_line, init_prob) # 初期値による分布
+plt.bar(x=x_line, height=model_prob, label='true model', 
+        color='white', alpha=1, edgecolor='red', linestyle='--') # 真の分布
+plt.bar(x_line, init_prob, color='purple') # 初期値による分布
 plt.xlabel('x')
 plt.ylabel('prob')
 plt.suptitle('Poisson Mixture Model', size = 20)
 plt.title('$iter:' + str(0) + 
           ', \lambda=[' + ', '.join([str(lmd) for lmd in np.round(lambda_k, 2)]) + ']' + 
           ', \pi=[' + ', '.join([str(pi) for pi in np.round(pi_k, 2)]) + ']$', loc='left')
+plt.legend()
 plt.show()
 
 #%%
@@ -200,9 +224,6 @@ for i in range(MaxIter):
 
 ## パラメータの事後分布を確認
 
-# 作図用のlambdaの点を作成
-lambda_line = np.linspace(0, 2 * np.max(lambda_truth_k), num=1000)
-
 # lambdaの事後分布を計算
 posterior_lambda_k = np.empty((K, len(lambda_line)))
 for k in range(K):
@@ -211,12 +232,12 @@ for k in range(K):
 # lambdaの事後分布を作図
 plt.figure(figsize=(12, 9))
 for k in range(K):
-    plt.plot(lambda_line, posterior_lambda_k[k], label='cluster:' + str(k + 1)) # lambdaの事後分布
-    plt.vlines(x=lambda_truth_k[k], ymin=0.0, ymax=np.max(posterior_lambda_k), 
-               color='red', linestyle='--') # 真の値
+    plt.plot(lambda_line, posterior_lambda_k[k], label='cluster:' + str(k + 1)) # 事後分布
+plt.vlines(x=lambda_truth_k, ymin=0.0, ymax=np.max(posterior_lambda_k), label='true val', 
+           color='red', linestyle='--') # 真の値
 plt.xlabel('$\lambda$')
 plt.ylabel('density')
-plt.suptitle('Gamma Distribution', size=20)
+plt.suptitle('Gamma Distribution:Gibbs Sampling', fontsize=20)
 plt.title('$iter:' + str(MaxIter) + ', N=' + str(N) + 
           ', \hat{a}=[' + ', '.join([str(a) for a in a_hat_k]) + ']' + 
           ', \hat{b}=[' + ', '.join([str(b) for b in b_hat_k]) + ']$', loc='left')
@@ -238,14 +259,15 @@ for k in range(K):
 
 # 最後のサンプルによる分布を作図
 plt.figure(figsize=(12, 9))
-plt.bar(x=x_line, height=res_prob) # 最後のサンプルによる分布
-plt.bar(x=x_line, height=model_prob, label='observation model', 
+plt.bar(x=x_line, height=model_prob, label='true model', 
         color='white', alpha=0.5, edgecolor='red', linestyle='--') # 真の分布
+plt.bar(x=x_line, height=res_prob, color='purple') # 最後のサンプルによる分布
 plt.xlabel('x')
 plt.ylabel('prob')
 plt.suptitle('Poisson Mixture Model:Gibbs Sampling', size = 20)
-plt.title('$iter:' + str(MaxIter) + ', N' + str(N) + 
-          ', \lambda=[' + ', '.join([str(lmd) for lmd in np.round(lambda_k, 2)]) + ']$', loc='left')
+plt.title('$iter:' + str(MaxIter) + ', N=' + str(N) + 
+          ', \lambda=[' + ', '.join([str(lmd) for lmd in np.round(lambda_k, 2)]) + ']' + 
+          ', \pi=[' + ', '.join([str(pi) for pi in np.round(pi_k, 2)]) + ']$', loc='left')
 plt.legend()
 plt.show()
 
@@ -258,13 +280,13 @@ color_list = ['red', 'green', 'blue']
 plt.figure(figsize=(12, 9))
 for k in range(K):
     plt.bar(x=x_line, height=[np.sum(x_n[s_truth_n == k] == x) for x in x_line], 
-            color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='cluster:' + str(k + 1)) # 真のクラスタ
+            color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='true cluster:' + str(k + 1)) # 真のクラスタ
 for k in range(K):
     plt.bar(x=x_line, height=[np.sum(x_n[s_n == k] == x) for x in x_line], 
             alpha=0.5, label='cluster:' + str(k + 1)) # 最後のクラスタ
 plt.xlabel('x')
 plt.ylabel('count')
-plt.suptitle('Poisson Mixture Model', size=20)
+plt.suptitle('Poisson Mixture Model', fontsize=20)
 plt.title('$N=' + str(N) + 
           ', \lambda=[' + ', '.join([str(lmd) for lmd in np.round(lambda_k, 2)]) + ']' + 
           ', \pi=[' + ', '.join([str(pi) for pi in np.round(pi_k, 2)]) + ']$', loc='left')
@@ -281,7 +303,7 @@ for k  in range(K):
     plt.plot(np.arange(MaxIter + 1), np.array(trace_a_ik).T[k], label='cluster:' + str(k + 1))
 plt.xlabel('iteration')
 plt.ylabel('value')
-plt.suptitle('Gibbs Sampling', size=20)
+plt.suptitle('Gibbs Sampling', fontsize=20)
 plt.title('$\hat{\mathbf{a}}$', loc='left')
 plt.legend()
 plt.grid()
@@ -295,7 +317,7 @@ for k  in range(K):
     plt.plot(np.arange(MaxIter + 1), np.array(trace_b_ik).T[k], label='cluster:' + str(k + 1))
 plt.xlabel('iteration')
 plt.ylabel('value')
-plt.suptitle('Gibbs Sampling', size=20)
+plt.suptitle('Gibbs Sampling', fontsize=20)
 plt.title('$\hat{\mathbf{b}}$', loc='left')
 plt.legend()
 plt.grid()
@@ -309,7 +331,7 @@ for k  in range(K):
     plt.plot(np.arange(MaxIter + 1), np.array(trace_alpha_ik).T[k], label='cluster:' + str(k + 1))
 plt.xlabel('iteration')
 plt.ylabel('value')
-plt.suptitle('Gibbs Sampling', size=20)
+plt.suptitle('Gibbs Sampling', fontsize=20)
 plt.title('$\hat{\\bf{\\alpha}}$', loc='left')
 plt.legend()
 plt.grid()
@@ -323,9 +345,11 @@ plt.show()
 plt.figure(figsize=(12, 9))
 for k  in range(K):
     plt.plot(np.arange(MaxIter + 1), np.array(trace_lambda_ik).T[k], label='cluster:' + str(k + 1))
+plt.hlines(y=lambda_truth_k, xmin=0.0, xmax=MaxIter, label='true val', 
+           color='red', linestyle='--') # 真の値
 plt.xlabel('iteration')
 plt.ylabel('value')
-plt.suptitle('Gibbs Sampling', size=20)
+plt.suptitle('Gibbs Sampling', fontsize=20)
 plt.title('$\hat{\\bf{\lambda}}$', loc='left')
 plt.legend()
 plt.grid()
@@ -337,9 +361,11 @@ plt.show()
 plt.figure(figsize=(12, 9))
 for k  in range(K):
     plt.plot(np.arange(MaxIter + 1), np.array(trace_pi_ik).T[k], label='cluster:' + str(k + 1))
+plt.hlines(y=pi_truth_k, xmin=0.0, xmax=MaxIter, label='true val', 
+           color='red', linestyle='--') # 真の値
 plt.xlabel('iteration')
 plt.ylabel('value')
-plt.suptitle('Gibbs Sampling', size=20)
+plt.suptitle('Gibbs Sampling', fontsize=20)
 plt.title('$\hat{\\bf{\pi}}$', loc='left')
 plt.legend()
 plt.grid()
@@ -375,11 +401,11 @@ def update_posterior(i):
     # i回目のlambdaの事後分布を作図
     for k in range(K):
         plt.plot(lambda_line, posterior_lambda_k[k], label='cluster:' + str(k + 1)) # 事後分布
-        plt.vlines(x=lambda_truth_k[k], ymin=0.0, ymax=np.max(posterior_lambda_k), 
-                   color='red', linestyle='--') # 真の値
+    plt.vlines(x=lambda_truth_k, ymin=0.0, ymax=np.max(posterior_lambda_k), label='true val', 
+               color='red', linestyle='--') # 真の値
     plt.xlabel('$\lambda$')
     plt.ylabel('density')
-    plt.suptitle('Gamma Distribution:Gibbs Sampling', size=20)
+    plt.suptitle('Gamma Distribution:Gibbs Sampling', fontsize=20)
     plt.title('$iter:' + str(i) + ', N=' + str(N) + 
               ', \hat{a}=[' + ', '.join([str(a) for a in trace_a_ik[i]]) + ']' + 
               ', \hat{b}=[' + ', '.join([str(b) for b in trace_b_ik[i]]) + ']$', loc='left')
@@ -392,9 +418,6 @@ posterior_anime.save("ch4_3_2_Posterior.gif")
 #%%
 
 ## サンプルの推移の確認
-
-# 分布の最大値を計算
-max_prob = np.max(poisson.pmf(k=x_line, mu=np.max(trace_lambda_ik)))
 
 # 画像サイズを指定
 fig = plt.figure(figsize=(12, 9))
@@ -414,15 +437,16 @@ def update_model(i):
         res_prob += tmp_prob * trace_pi_ik[i][k]
     
     # i回目のサンプルによる分布を作図
-    plt.bar(x=x_line, height=res_prob) # サンプルによる分布
-    plt.bar(x=x_line, height=model_prob, label='observation model', 
+    plt.bar(x=x_line, height=model_prob, label='true model', 
             color='white', alpha=0.5, edgecolor='red', linestyle='--') # 真の分布
+    plt.bar(x=x_line, height=res_prob) # サンプルによる分布
     plt.xlabel('x')
     plt.ylabel('prob')
     plt.suptitle('Poisson Mixture Model:Gibbs Sampling', size = 20)
     plt.title('$iter:' + str(i) + ', N' + str(N) + 
-              ', \lambda=[' + ', '.join([str(lmd) for lmd in np.round(trace_lambda_ik[i], 2)]) + ']$', loc='left')
-    plt.ylim(0.0, max_prob)
+              ', \lambda=[' + ', '.join([str(lmd) for lmd in np.round(trace_lambda_ik[i], 2)]) + ']' + 
+              ', \pi=[' + ', '.join([str(pi) for pi in np.round(trace_pi_ik[i], 2)]) + ']$', loc='left')
+    plt.ylim(0.0, 0.1)
     plt.legend()
 
 # gif画像を作成
@@ -448,13 +472,13 @@ def update_cluster(i):
     # i回目のクラスタの散布図を作成
     for k in range(K):
         plt.bar(x=x_line, height=[np.sum(x_n[s_truth_n == k] == x) for x in x_line], 
-                color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='true:' + str(k + 1)) # 真のクラスタ
+                color='white', alpha=1, edgecolor=color_list[k], linestyle='--', label='true cluster:' + str(k + 1)) # 真のクラスタ
     for k in range(K):
         plt.bar(x=x_line, height=[np.sum(x_n[np.array(trace_s_in[i]) == k] == x) for x in x_line], 
                 alpha=0.5, label='cluster:' + str(k + 1)) # サンプルしたクラスタ
     plt.xlabel('x')
     plt.ylabel('count')
-    plt.suptitle('Poisson Mixture Model:Gibbs Sampling', size=20)
+    plt.suptitle('Poisson Mixture Model:Gibbs Sampling', fontsize=20)
     plt.title('$iter:' + str(i) + ', N=' + str(N) + 
               ', \lambda=[' + ', '.join([str(lmd) for lmd in np.round(trace_lambda_ik[i], 2)]) + ']' + 
               ', \pi=[' + ', '.join([str(pi) for pi in np.round(trace_pi_ik[i], 2)]) + ']$', loc='left')

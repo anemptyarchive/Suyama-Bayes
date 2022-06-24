@@ -649,7 +649,6 @@ for(i in 1:(MaxIter + 1)) {
     x_1 = x_point_mat[, 1], 
     x_2 = x_point_mat[, 2], 
     density = res_density, 
-    iteration = as.factor(i - 1), 
     label = paste0(
       "iter:", i - 1, ", N=", N, 
       ", pi=(", paste0(round(trace_pi_ik[i, ], 3), collapse = ", "), ")"
@@ -665,7 +664,6 @@ for(i in 1:(MaxIter + 1)) {
     x_n1 = x_nd[, 1], 
     x_n2 = x_nd[, 2], 
     cluster = as.factor(trace_s_in[i, ]), 
-    iteration = as.factor(i - 1), 
     label = paste0(
       "iter:", i - 1, ", N=", N, 
       ", pi=(", paste0(round(trace_pi_ik[i, ], 3), collapse = ", "), ")"
@@ -689,9 +687,9 @@ trace_model_graph <- ggplot() +
              color = "red", shape = 4, size = 5) + # 真の平均
   geom_contour(data = trace_model_df, aes(x = x_1, y = x_2, z = density, color = ..level..)) + # サンプルによる分布
   geom_point(data = trace_cluster_df, aes(x = x_n1, y = x_n2)) + # 観測データ
-  gganimate::transition_manual(iteration) + # フレーム
+  gganimate::transition_manual(label) + # フレーム
   labs(title = "Gaussian Mixture Model:Gibbs Sampling", 
-       subtitle = paste0("iter:{current_frame}", ", N=", N, ", K=", K), 
+       subtitle = paste0("iter:{current_frame}"), 
        x = expression(x[1]), y = expression(x[2]))
 
 # gif画像を作成

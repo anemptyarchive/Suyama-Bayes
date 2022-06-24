@@ -264,7 +264,7 @@ plt.vlines(x=lambda_truth_k, ymin=0.0, ymax=np.max(posterior_lambda_kl),
            color='red', linestyle='--', label='true val') # 真の値
 plt.xlabel('$\lambda$')
 plt.ylabel('density')
-plt.suptitle('Gamma Distribution', size=20)
+plt.suptitle('Gamma Distribution:Variational Inference', size=20)
 plt.title('$iter:' + str(MaxIter) + ', N=' + str(N) + 
           ', \hat{a}=[' + ', '.join([str(a) for a in np.round(a_hat_k, 1)]) + ']' + 
           ', \hat{b}=[' + ', '.join([str(b) for b in np.round(b_hat_k, 1)]) + ']$', loc='left')

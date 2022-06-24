@@ -8,18 +8,37 @@ library(mvnfast)
 
 ### 尤度(多次元ガウス分布)の設定 -----
 
-# 真のパラメータを指定
+# (既知の)平均パラメータを指定
 mu_d <- c(25, 50)
-sigma_truth_dd <- matrix(c(20, 15, 15, 30), nrow = 2, ncol = 2)
-lambda_truth_dd <- solve(sigma_truth_dd^2)
+
+# 真の分散共分散行列を指定
+sigma2_truth_dd <- matrix(c(600, -100, -100, 400), nrow = 2, ncol = 2)
+sqrt(sqrt(sigma2_truth_dd^2)) # (似非)相関行列を確認
+
+# 真の精度行列を計算
+lambda_truth_dd <- solve(sigma2_truth_dd)
+
+
+# 作図用のxのx軸の値を作成
+x_1_vec <- seq(
+  mu_d[1] - 3 * sqrt(sigma2_truth_dd[1, 1]), 
+  mu_d[1] + 3 * sqrt(sigma2_truth_dd[1, 1]), 
+  length.out = 500
+)
+
+# 作図用のxのy軸の値を作成
+x_2_vec <- seq(
+  mu_d[2] - 3 * sqrt(sigma2_truth_dd[2, 2]), 
+  mu_d[2] + 3 * sqrt(sigma2_truth_dd[2, 2]), 
+  length.out = 500
+)
 
 # 作図用のxの点を作成
-x_1_vec <- seq(mu_d[1] - 4 * sigma_truth_dd[1, 1], mu_d[1] + 4 * sigma_truth_dd[1, 1], length.out = 1000)
-x_2_vec <- seq(mu_d[2] - 4 * sigma_truth_dd[2, 2], mu_d[2] + 4 * sigma_truth_dd[2, 2], length.out = 1000)
 x_point_mat <- cbind(
   rep(x_1_vec, times = length(x_2_vec)), 
   rep(x_2_vec, each = length(x_1_vec))
 )
+
 
 # 尤度を計算:式(2.72)
 model_df <- tibble(
@@ -52,6 +71,7 @@ x_nd <- mvnfast::rmvn(n = N, mu = mu_d, sigma = solve(lambda_truth_dd))
 # 観測データを確認
 summary(x_nd)
 
+
 # 観測データのデータフレームを作成
 x_df <- tibble(
   x_n1 = x_nd[, 1], 
@@ -63,8 +83,9 @@ ggplot() +
   geom_point(data = x_df, aes(x = x_n1, y = x_n2)) + # 観測データ
   geom_contour(data = model_df, aes(x = x_1, y = x_2, z = density, color = ..level..)) + # 尤度
   labs(title = "Multivariate Gaussian Distribution", 
-       subtitle = paste0("N=", N, ", mu=(", paste(mu_d, collapse = ", "), ")", 
-                         ", sigma=(", paste(sqrt(solve(lambda_truth_dd)), collapse = ", "), ")"), 
+       subtitle = paste0("N=", N, 
+                         ", mu=(", paste(mu_d, collapse = ", "), ")", 
+                         ", lambda=(", paste(round(lambda_truth_dd, 5), collapse = ", "), ")"), 
        x = expression(x[1]), y = expression(x[2]), 
        color = "density")
 
@@ -72,8 +93,9 @@ ggplot() +
 ### 事前分布(ウィシャート分布)の設定 -----
 
 # lambdaの事前分布のパラメータを指定
-w_dd <- matrix(c(0.0005, 0, 0, 0.0005), nrow = 2, ncol = 2)
 nu <- 2
+w_dd <- matrix(c(0.0005, 0, 0, 0.0005), nrow = 2, ncol = 2)
+
 
 # lambdaの期待値を計算:式(2.89)
 E_lambda_dd <- nu * w_dd
@@ -99,13 +121,14 @@ ggplot() +
        color = "density")
 
 
-### 事後分布(ウィシャート分布)の設定 -----
+### 事後分布(ウィシャート分布)の計算 -----
 
 # lambdaの事後分布のパラメータを計算:式(3.116)
 w_hat_dd <- solve(
   (t(x_nd) - mu_d) %*% t(t(x_nd) - mu_d) + solve(w_dd)
 )
 nu_hat <- N + nu
+
 
 # lambdaの期待値を計算:式(2.89)
 E_lambda_hat_dd <- nu_hat * w_hat_dd
@@ -125,7 +148,8 @@ ggplot() +
   geom_contour(data = model_df, aes(x = x_1, y = x_2, z = density, color = ..level..), 
                alpha = 0.5, linetype = "dashed") + # 尤度
   labs(title = "Multivariate Gaussian Distribution", 
-       subtitle = paste0("N=", N, ", nu_hat=", nu_hat, 
+       subtitle = paste0("N=", N, 
+                         ", nu_hat=", nu_hat, 
                          ", W_hat=(", paste(round(w_hat_dd, 5), collapse = ", "), ")"), 
        x = expression(x[1]), y = expression(x[2]), 
        color = "density")
@@ -140,6 +164,7 @@ D <- length(mu_d)
 mu_s_d <- mu_d
 lambda_s_hat_dd <- (1 - D + nu_hat) * w_hat_dd
 nu_s_hat <- 1 - D + nu_hat
+
 
 # 予測分布を計算:式(3.121)
 predict_df <- tibble(
@@ -157,33 +182,37 @@ ggplot() +
                alpha = 0.5, linetype = "dashed") + # 尤度
   geom_point(data = x_df, aes(x = x_n1, y = x_n2)) + # 観測データ
   labs(title = "Multivariate Student's t Distribution", 
-       subtitle = paste0("N=", N, ", nu_s_hat=", nu_s_hat, 
-                         ", lambda_s_hat=(", paste(round(lambda_s_hat_dd, 5), collapse = ", "), ")"), 
+       subtitle = paste0("N=", N, 
+                         ", lambda_s_hat=(", paste(round(lambda_s_hat_dd, 5), collapse = ", "), ")", 
+                         ", nu_s_hat=", nu_s_hat), 
        x = expression(x[1]), y = expression(x[2]), 
        color = "density")
 
 
-# ・アニメーション ---------------------------------------------------------------------
+# ・アニメーションによる推移の確認 ---------------------------------------------------------------------
 
-# 利用するパッケージ
+# 3.4.2項で利用するパッケージ
 library(tidyverse)
 library(mvnfast)
 library(gganimate)
 
 
-### 推論処理 -----
+### モデルの設定 -----
 
-# 真のパラメータを指定
+# (既知の)平均パラメータを指定
 mu_d <- c(25, 50)
-sigma_truth_dd <- matrix(c(20, 15, 15, 30), nrow = 2, ncol = 2)
-lambda_truth_dd <- solve(sigma_truth_dd^2)
 
-# 事前分布のパラメータを指定
+# 真の分散共分散行列を指定
+sigma2_truth_dd <- matrix(c(600, 100, 100, 400), nrow = 2, ncol = 2)
+
+# 真の精度行列を計算
+lambda_truth_dd <- solve(sigma2_truth_dd)
+
+
+# lambdaの事前分布のパラメータを指定
 nu <- 2
 w_dd <- matrix(c(0.0005, 0, 0, 0.0005), nrow = 2, ncol = 2)
 
-# 初期値によるlambdaの期待値を計算:式(2.89)
-E_lambda_dd <- nu * w_dd
 
 # 初期値による予測分布のパラメータを計算:式(3.124)
 mu_s_d <- mu_d
@@ -191,24 +220,38 @@ lambda_s_dd <- (nu - 1) * w_dd
 nu_s <- nu - 1
 
 
+# 作図用のxのx軸の値を作成
+x_1_vec <- seq(
+  mu_d[1] - 3 * sqrt(sigma2_truth_dd[1, 1]), 
+  mu_d[1] + 3 * sqrt(sigma2_truth_dd[1, 1]), 
+  length.out = 250
+)
+
+# 作図用のxのy軸の値を作成
+x_2_vec <- seq(
+  mu_d[2] - 3 * sqrt(sigma2_truth_dd[2, 2]), 
+  mu_d[2] + 3 * sqrt(sigma2_truth_dd[2, 2]), 
+  length.out = 250
+)
+
 # 作図用のxの点を作成
-x_1_vec <- seq(mu_d[1] - 4 * sigma_truth_dd[1, 1], mu_d[1] + 4 * sigma_truth_dd[1, 1], length.out = 500)
-x_2_vec <- seq(mu_d[2] - 4 * sigma_truth_dd[2, 2], mu_d[2] + 4 * sigma_truth_dd[2, 2], length.out = 500)
 x_point_mat <- cbind(
   rep(x_1_vec, times = length(x_2_vec)), 
   rep(x_2_vec, each = length(x_1_vec))
 )
+
 
 # 事前分布の期待値を用いた分布を計算:式(2.72)
 posterior_df <- tibble(
   x_1 = x_point_mat[, 1], 
   x_2 = x_point_mat[, 2], 
   density = mvnfast::dmvn(
-    X = x_point_mat, mu = mu_d, sigma = solve(E_lambda_dd)
+    X = x_point_mat, mu = mu_d, sigma = solve(nu * w_dd)
   ), 
   label = as.factor(
     paste0(
-      "N=", 0, ", nu=", nu, 
+      "N=", 0, 
+      ", nu=", nu, 
       ", W=(", paste(round(w_dd, 5), collapse = ", "), ")"
     )
   )
@@ -223,12 +266,15 @@ predict_df <- tibble(
   ), 
   label = as.factor(
     paste0(
-      "N=", 0, ", nu_s=", nu_s, 
-      ", lambda_s=(", paste(round(lambda_s_dd, 5), collapse = ", "), ")"
+      "N=", 0, 
+      ", lambda_s=(", paste(round(lambda_s_dd, 5), collapse = ", "), ")", 
+      ", nu_s=", nu_s
     )
   )
 )
 
+
+### 推論処理 -----
 
 # データ数(試行回数)を指定
 N <- 100
@@ -249,19 +295,17 @@ for(n in 1:N) {
   )
   nu <- 1 + nu
   
-  # lambdaの期待値を計算:式(2.89)
-  E_lambda_dd <- nu * w_dd
-  
-  # 事後分布の期待値を用いた分布を更新:式(2.72)
+  # 事後分布の期待値を用いた分布を計算:式(2.72)
   tmp_posterior_df <- tibble(
     x_1 = x_point_mat[, 1], 
     x_2 = x_point_mat[, 2], 
     density = mvnfast::dmvn(
-      X = x_point_mat, mu = mu_d, sigma = solve(E_lambda_dd)
+      X = x_point_mat, mu = mu_d, sigma = solve(nu * w_dd)
     ), 
     label = as.factor(
       paste0(
-        "N=", n, ", nu_hat=", nu, 
+        "N=", n, 
+        ", nu_hat=", nu, 
         ", W_hat=(", paste(round(w_dd, 5), collapse = ", "), ")"
       )
     )
@@ -281,13 +325,14 @@ for(n in 1:N) {
     ), 
     label = as.factor(
       paste0(
-        "N=", n, ", nu_s_hat=", nu_s, 
-        ", lambda_s_hat=(", paste(round(lambda_s_dd, 5), collapse = ", "), ")"
+        "N=", n, 
+        ", lambda_s_hat=(", paste(round(lambda_s_dd, 5), collapse = ", "), ")", 
+        ", nu_s_hat=", nu_s
       )
     )
   )
   
-  # 推論結果を結合
+  # n回目の結果を結合
   posterior_df <- rbind(posterior_df, tmp_posterior_df)
   predict_df <- rbind(predict_df, tmp_predict_df)
   

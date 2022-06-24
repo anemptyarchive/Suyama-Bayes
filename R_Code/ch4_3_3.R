@@ -137,12 +137,12 @@ ggplot(E_prior_df, aes(x = x, y = prob)) +
 
 ### 初期値の設定 -----
 
-# 潜在変数の事後分布の期待値を初期化
+# 潜在変数の近似事後分布の期待値を初期化
 E_s_nk <- runif(n = N * K, min = 0, max = 1) %>% 
   matrix(nrow = N, ncol = K)
 E_s_nk <- E_s_nk / rowSums(E_s_nk) # 正規化
 
-# 初期値によるlambdaの事後分布のパラメータを計算:式(4.55)
+# 初期値によるlambdaの近似事後分布のパラメータを計算:式(4.55)
 a_hat_k <- colSums(E_s_nk * x_n) + a
 b_hat_k <- colSums(E_s_nk) + b
 
@@ -153,7 +153,7 @@ alpha_hat_k <- colSums(E_s_nk) + alpha_k
 # 初期値によるlambdaの近似事後分布をデータフレームに格納
 init_lambda_df <- tibble()
 for(k in 1:K) {
-  # クラスタkの事後分布を計算
+  # クラスタkの近似事後分布を計算
   tmp_init_df <- tibble(
     lambda = lambda_vec, 
     density = dgamma(x = lambda, shape = a_hat_k[k], rate = b_hat_k[k]), 
@@ -255,22 +255,22 @@ trace_alpha_ik[1, ] <- alpha_hat_k
 # 変分推論
 for(i in 1:MaxIter) {
   
-  # 潜在変数の事後分布のパラメータの各項を計算:式(4.60-4.62)
+  # 潜在変数の近似事後分布のパラメータの各項を計算:式(4.60-4.62)
   E_lmd_k <- a_hat_k / b_hat_k
   E_ln_lmd_k <- digamma(a_hat_k) - log(b_hat_k)
   E_ln_pi_k <- digamma(alpha_hat_k) - digamma(sum(alpha_hat_k))
   
   for(n in 1:N) {
     
-    # 潜在変数の事後分布のパラメータを計算:式(4.51)
+    # 潜在変数の近似事後分布のパラメータを計算:式(4.51)
     tmp_eta_k <- exp(x_n[n] * E_ln_lmd_k - E_lmd_k + E_ln_pi_k)
     eta_nk[n, ] <- tmp_eta_k / sum(tmp_eta_k) # 正規化
     
-    # 潜在変数の事後分布の期待値を計算:式(4.59)
+    # 潜在変数の近似事後分布の期待値を計算:式(4.59)
     E_s_nk[n, ] <- eta_nk[n, ]
   }
   
-  # lambdaの事後分布のパラメータを計算:式(4.55)
+  # lambdaの近似事後分布のパラメータを計算:式(4.55)
   a_hat_k <- colSums(E_s_nk * x_n) + a
   b_hat_k <- colSums(E_s_nk) + b
   
@@ -293,7 +293,7 @@ for(i in 1:MaxIter) {
 # lambdaの近似事後分布をデータフレームに格納
 posterior_lambda_df <- tibble()
 for(k in 1:K) {
-  # クラスタkの事後分布を計算
+  # クラスタkの近似事後分布を計算
   tmp_posterior_df <- tibble(
     lambda = lambda_vec, 
     density = dgamma(x = lambda, shape = a_hat_k[k], rate = b_hat_k[k]), 
@@ -306,7 +306,7 @@ for(k in 1:K) {
 
 # lambdaの近似事後分布を作図
 ggplot(posterior_lambda_df, aes(x = lambda, y = density, color = cluster)) + 
-  geom_line() + # lambdaの事後分布
+  geom_line() + # lambdaの近似事後分布
   geom_vline(xintercept = lambda_truth_k, color = "red", linetype = "dashed") + # 真の値
   labs(title = "Gamma Distribution:Variational Inference", 
        subtitle = paste0("iter:", MaxIter, ", N=", N, 
@@ -441,7 +441,7 @@ lambda_vec <- seq(0, 2 * max(lambda_truth_k), length.out = 1000)
 trace_posterior_lambda_df <- tibble()
 for(i in 1:(MaxIter + 1)) {
   for(k in 1:K) {
-    # クラスタkの事後分布を計算
+    # クラスタkの近似事後分布を計算
     tmp_posterior_df <- tibble(
       lambda = lambda_vec, 
       density = dgamma(x = lambda, shape = trace_a_ik[i, k], rate = trace_b_ik[i, k]), 
@@ -462,9 +462,9 @@ for(i in 1:(MaxIter + 1)) {
   print(paste0((i - 1), ' (', round((i - 1) / MaxIter * 100, 1), '%)'))
 }
 
-# lambdaの事後分布を作図
+# lambdaの近似事後分布を作図
 trace_graph <- ggplot() + 
-  geom_line(data = trace_posterior_lambda_df, aes(x = lambda, y = density, color = cluster)) + # lambdaの事後分布
+  geom_line(data = trace_posterior_lambda_df, aes(x = lambda, y = density, color = cluster)) + # lambdaの近似事後分布
   geom_vline(xintercept = lambda_truth_k, color = "red", linetype = "dashed") + # 真の値
   gganimate::transition_manual(label) + # フレーム
   labs(title = "Gamma Distribution:Variational Inference", 

@@ -3,6 +3,7 @@
 
 # 4.3.2項で利用するパッケージ
 library(tidyverse)
+library(MCMCpack)
 
 
 ### 観測モデル(ポアソン混合分布)の設定 -----

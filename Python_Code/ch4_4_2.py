@@ -238,7 +238,7 @@ plt.show()
 #%%
 
 # 試行回数を指定
-MaxIter = 150
+MaxIter = 250
 
 # パラメータを初期化
 eta_nk = np.zeros((N, K))
@@ -334,7 +334,7 @@ for k in range(K):
     posterior_density_kg[k] = multivariate_normal.pdf(
         x=mu_point, 
         mean=m_hat_kd[k], 
-        cov=np.linalg.inv(beta_hat_k[k] * nu_hat_k[k] * w_hat_kdd[k])
+        cov=np.linalg.inv(beta_hat_k[k] * lambda_kdd[k])
     )
 
 # muの事後分布を作図
@@ -538,7 +538,7 @@ def update_posterior(i):
         posterior_density_kg[k] = multivariate_normal.pdf(
             x=mu_point, 
             mean=trace_m_ikd[i][k], 
-            cov=np.linalg.inv(trace_beta_ik[i][k] * trace_nu_ik[i][k] * trace_w_ikdd[i][k])
+            cov=np.linalg.inv(trace_beta_ik[i][k] * trace_lambda_ikdd[i][k])
         )
     
     # 前フレームのグラフを初期化

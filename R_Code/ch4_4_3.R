@@ -283,8 +283,7 @@ ggplot() +
                color = "red", alpha = 0.5, linetype = "dashed") + # 真の分布
   geom_contour_filled(data = init_df, aes(x = x_1, y = x_2, z = density, fill = ..level..), 
                       alpha = 0.6) + # 期待値による分布
-  geom_point(data = s_df, aes(x = x_n1, y = x_n2, color = cluster), 
-             alpha = s_df[["prob"]]) + # 確率値によるクラスタ
+  geom_point(data = s_df, aes(x = x_n1, y = x_n2, color = cluster, alpha = prob)) + # 確率値によるクラスタ
   labs(title = "Gaussian Mixture Model", 
        subtitle = paste0("iter:", 0, ", N=", N, ", K=", K), 
        x = expression(x[1]), y = expression(x[2]))
@@ -339,11 +338,11 @@ for(i in 1:MaxIter) {
   # 潜在変数の近似事後分布の期待値を計算:式(4.59)
   E_s_nk <- eta_nk
   
-  # 初期値によるmuの近似事後分布のパラメータを計算:式(4.114)
+  # muの近似事後分布のパラメータを計算:式(4.114)
   beta_hat_k <- colSums(E_s_nk) + beta
   m_hat_kd <- t(t(x_nd) %*% E_s_nk + beta * m_d) / beta_hat_k
   
-  # 初期値によるlambdaの近似事後分布のパラメータを計算:式(4.118)
+  # lambdaの近似事後分布のパラメータを計算:式(4.118)
   w_hat_ddk <- array(0, dim = c(D, D, K))
   term_m_dd <- beta * matrix(m_d) %*% t(m_d)
   for(k in 1:K) {
@@ -450,8 +449,7 @@ ggplot() +
              color = "red", shape = 4, size = 5) + # 真の平均
   geom_contour_filled(data = res_df, aes(x = x_1, y = x_2, z = density, fill = ..level..), 
                       alpha = 0.6) + # 期待値による分布
-  geom_point(data = s_df, aes(x = x_n1, y = x_n2, color = cluster), 
-             alpha = s_df[["prob"]]) + # 確率値によるクラスタ
+  geom_point(data = s_df, aes(x = x_n1, y = x_n2, color = cluster, alpha = prob)) + # 確率値によるクラスタ
   labs(title = "Gaussian Mixture Model:Variational Inference", 
        subtitle = paste0("iter:", MaxIter, ", N=", N, 
                          ", E[pi]=(", paste0(round(alpha_hat_k / sum(alpha_hat_k), 3), collapse = ", "), ")"), 
@@ -613,7 +611,6 @@ for(i in 1:(MaxIter + 1)) {
     x_1 = x_point_mat[, 1], 
     x_2 = x_point_mat[, 2], 
     density = res_density, 
-    iteration = as.factor(i - 1), 
     label = paste0(
       "iter:", i - 1, ", N=", N, 
       ", pi=(", paste0(round(trace_alpha_ik[i, ] / sum(trace_alpha_ik[i, ]), 3), collapse = ", "), ")"
@@ -631,7 +628,6 @@ for(i in 1:(MaxIter + 1)) {
     x_n2 = x_nd[, 2], 
     cluster = as.factor(max.col(tmp_E_s_nk)), # 確率が最大のクラスタ番号
     prob = tmp_E_s_nk[cbind(1:N, max.col(tmp_E_s_nk))], # 確率の最大値
-    iteration = as.factor(i - 1), 
     label = paste0(
       "iter:", i - 1, ", N=", N, 
       ", pi=(", paste0(round(trace_alpha_ik[i, ] / sum(trace_alpha_ik[i, ]), 3), collapse = ", "), ")"
@@ -655,9 +651,9 @@ trace_model_graph <- ggplot() +
              color = "red", shape = 4, size = 5) + # 真の平均
   geom_contour(data = trace_model_df, aes(x = x_1, y = x_2, z = density, color = ..level..)) + # 期待値による分布
   geom_point(data = trace_cluster_df, aes(x = x_n1, y = x_n2)) + # 観測データ
-  gganimate::transition_manual(iteration) + # フレーム
+  gganimate::transition_manual(label) + # フレーム
   labs(title = "Gaussian Mixture Model:Variational Inference", 
-       subtitle = paste0("iter:{current_frame}", ", N=", N, ", K=", K), 
+       subtitle = paste0("iter:{current_frame}"), 
        x = expression(x[1]), y = expression(x[2]))
 
 # gif画像を作成
@@ -672,8 +668,7 @@ trace_cluster_graph <- ggplot() +
              color = "red", shape = 4, size = 5) + # 真の平均
   geom_contour_filled(data = trace_model_df, aes(x = x_1, y = x_2, z = density), 
                       alpha = 0.6) + # 期待値による分布
-  geom_point(data = trace_cluster_df, aes(x = x_n1, y = x_n2, color = cluster), 
-             alpha = trace_cluster_df[["prob"]]) + # 確率が最大のクラスタ
+  geom_point(data = trace_cluster_df, aes(x = x_n1, y = x_n2, color = cluster, alpha = prob)) + # 確率が最大のクラスタ
   gganimate::transition_manual(label) + # フレーム
   labs(title = "Gaussian Mixture Model:Variational Inference", 
        subtitle = "{current_frame}", 
