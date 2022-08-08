@@ -1,13 +1,20 @@
 
 # 3.3.2 1次元ガウス分布の学習と予測：精度が未知の場合 ------------------------------------------------------------------
 
-# 3.3.2項で利用するパッケージ
+# 利用パッケージ
 library(tidyverse)
+library(gganimate)
+library(LaplacesDemon)
+
+# チェック用
+library(ggplot2)
 
 
-### 尤度(ガウス分布)の設定 -----
+# ベイズ推論の実装 ----------------------------------------------------------------
 
-# (既知の)パラメータを指定
+### ・生成分布(ガウス分布)の設定 -----
+
+# 既知のパラメータを指定
 mu <- 25
 
 # 真の精度パラメータを指定
@@ -15,84 +22,89 @@ lambda_truth <- 0.01
 sqrt(1 / lambda_truth) # 標準偏差
 
 
-# 作図用のxの値を作成
+# グラフ用のxの値を作成
 x_vec <- seq(
-  mu - 4 * sqrt(1 / lambda_truth), 
-  mu + 4 * sqrt(1 / lambda_truth), 
-  length.out = 1000
+  mu - 1/sqrt(lambda_truth) * 4, 
+  mu + 1/sqrt(lambda_truth) * 4, 
+  length.out = 501
 )
 
-# 尤度を計算:式(2.64)
-model_df <- tibble(
-  x = x_vec, # x軸の値
-  ln_C_N = - 0.5 * (log(2 * pi) - log(lambda_truth)), # 正規化項(対数)
-  density = exp(ln_C_N - 0.5 * lambda_truth * (x - mu)^2) # 確率密度
-  #C_N = 1 / sqrt(2 * pi / lambda_truth), # 正規化項
-  #density = C_N * exp(- 0.5 * lambda_truth * (x - mu)^2) # 確率密度
-  #density = dnorm(x, mean = mu, sd = sqrt(1 / lambda_truth)) # 確率密度
+# 真の分布を計算:式(2.64)
+model_df <- tibble::tibble(
+  x = x_vec, # 確率変数
+  dens = dnorm(x, mean = mu, sd = 1/sqrt(lambda_truth)) # 確率密度
 )
 
-# 尤度を作図
-ggplot(model_df, aes(x = x, y = density)) + 
-  geom_line(color = "blue") + # 尤度
+# 真の分布を作図
+ggplot() + 
+  geom_line(data = model_df, mapping = aes(x = x, y = dens, color = "model"), 
+            size = 1) + # 真の分布
+  scale_color_manual(breaks = "model", values = "purple", labels = "true model", name = "") + # 線の色:(凡例表示用)
   labs(title = "Gaussian Distribution", 
-       subtitle = paste0("mu=", round(mu, 2), ", lambda=",lambda_truth))
+       subtitle = parse(text = paste0("list(mu==", mu, ", lambda==", lambda_truth, ")")), 
+       x = "x", y = "density")
 
 
-### データの生成 -----
+### ・データの生成 -----
 
 # (観測)データ数を指定
 N <- 50
 
+
 # ガウス分布に従うデータを生成
-x_n <- rnorm(n = N, mean = mu, sd = sqrt(1 / lambda_truth))
-
-# 観測データを確認
-summary(x_n)
+x_n <- rnorm(n = N, mean = mu, sd = 1/sqrt(lambda_truth))
 
 
-# 観測データのデータフレームを作成
-data_df <- tibble(x_n = x_n)
+# 観測データを格納
+data_df <- tibble::tibble(x = x_n)
 
 # 観測データのヒストグラムを作成
 ggplot() + 
-  #geom_histogram(data = data_df, aes(x = x_n), binwidth = 1) + # 観測データ:(度数)
-  geom_histogram(data = data_df, aes(x = x_n, y = ..density..), binwidth = 1) + # 観測データ:(相対度数)
-  geom_line(data = model_df, aes(x = x, y = density), 
-            color = "red", linetype = "dashed") + # 真の分布
+  geom_histogram(data = data_df, aes(x = x, y = ..density.., fill = "data"), 
+                 bins = 30) + # 観測データ(密度)
+  geom_line(data = model_df, mapping = aes(x = x, y = dens, color = "model"), 
+            size = 1, linetype = "dashed") + # 真の分布
+  scale_fill_manual(values = c(model = NA, data = "pink"), na.value = NA, 
+                    labels = c(model = "true model", data = "observation data"), name = "") + # バーの色:(凡例表示用)
+  scale_color_manual(values = c(model = "red", data = "pink"), 
+                     labels = c(model = "true model", data = "observation data"), name = "") + # 線の色:(凡例表示用)
+  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c("dashed", "blank")))) + # 凡例の体裁:(凡例表示用)
   labs(title = "Gaussian Distribution", 
-       subtitle = paste0("N=", N, ", mu=", mu, ", lambda=", lambda_truth), 
-       x = "x")
+       subtitle = parse(text = paste0("list(mu==", mu, ", lambda==", lambda_truth, ", N==", N, ")")), 
+       x = "x", y = "density")
 
 
-### 事前分布(ガンマ分布)の設定 -----
+### ・事前分布(ガンマ分布)の設定 -----
 
 # lambdaの事前分布のパラメータを指定
 a <- 1
 b <- 1
 
 
-# 作図用のlambdaの値を作成
-lambda_vec <- seq(0, 4 * lambda_truth, length.out = 1000)
+# グラフ用のlambdaの値を作成
+lambda_vec <- seq(0, lambda_truth * 4, length.out = 501)
 
 # lambdaの事前分布を計算:式(2.56)
-prior_df <- tibble(
-  lambda = lambda_vec, # x軸の値
-  ln_C_Gam = a * log(b) - lgamma(a), # 正規化項(対数)
-  density = exp(ln_C_Gam + (a - 1) * log(lambda) - b * lambda) # 確率密度
-  #density = dgamma(x = lambda, shape = a, rate = b) # 確率密度
+prior_df <- tibble::tibble(
+  lambda = lambda_vec, # 確率変数
+  dens = dgamma(x = lambda_vec, shape = a, rate = b) # 確率密度
 )
 
 # lambdaの事前分布を作図
-ggplot(prior_df, aes(x = lambda, y = density)) + 
-  geom_line(color = "purple") + # lambdaの事前分布
-  geom_vline(aes(xintercept = lambda_truth), 
-             color = "red", linetype = "dashed") + # 真の値
+ggplot() + 
+  geom_vline(mapping = aes(xintercept = lambda_truth, color = "param"), 
+             size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
+  geom_line(data = prior_df, mapping = aes(x = lambda, y = dens, color = "prior"), 
+            size = 1) + # muの事前分布
+  scale_color_manual(values = c(param = "red", prior = "purple"), 
+                     labels = c(param = "true parameter", prior = "prior"), name = "") + # 線の色:(凡例表示用)
+  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c("dashed", "solid")))) + # 凡例の体裁:(凡例表示用)
   labs(title = "Gamma Distribution", 
-       subtitle = paste0("a=", a, ", b=", b))
+       subtitle = paste0("a=", a, ", b=", b), 
+       x = expression(lambda), y = "density")
 
 
-### 事後分布(ガンマ分布)の計算 -----
+### ・事後分布(ガンマ分布)の計算 -----
 
 # lambdaの事後分布のパラメータを計算:式(3.69)
 a_hat <- 0.5 * N + a
@@ -100,231 +112,275 @@ b_hat <- 0.5 * sum((x_n - mu)^2) + b
 
 
 # lambdaの事後分布を計算:式(2.56)
-posterior_df <- tibble(
-  lambda = lambda_vec, # x軸の値
-  ln_C_Gam = a_hat * log(b_hat) - lgamma(a_hat), # 正規化項(対数)
-  density = exp(ln_C_Gam + (a_hat - 1) * log(lambda) - b_hat * lambda) # 確率密度
-  #density = dgamma(x = lambda, shape = a_hat, rate = b_hat) # 確率密度
+posterior_df <-tibble:: tibble(
+  lambda = lambda_vec, # 確率変数
+  dens = dgamma(x = lambda_vec, shape = a_hat, rate = b_hat) # 確率密度
 )
 
 # lambdaの事後分布を作図
-ggplot(posterior_df, aes(x = lambda, y = density)) + 
-  geom_line(color = "purple") + # lambdaの事後分布
-  geom_vline(aes(xintercept = lambda_truth), 
-             color = "red", linetype = "dashed") + # 真の値
+ggplot() + 
+  geom_vline(aes(xintercept = lambda_truth, color = "param"), 
+             size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
+  geom_line(data = posterior_df, mapping = aes(x = lambda, y = dens, color = "posterior"), 
+            size = 1) + # muの事後分布
+  scale_color_manual(values = c(param = "red", posterior = "purple"), 
+                     labels = c(param = "true parameter", posterior = "posterior"), name = "") + # 線の色:(凡例表示用)
+  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), 
+                                                  linetype = c("dashed", "solid")))) + # 凡例の体裁:(凡例表示用)
   labs(title = "Gamma Distribution", 
-       subtitle = paste0("N=", N, ", a_hat=", a_hat, ", b_hat=", round(b_hat, 1)), 
-       x = expression(lambda))
+       subtitle = parse(
+         text = paste0("list(N==", N, ", hat(a)==", a_hat, ", hat(b)==", round(b_hat, 1), ")")
+       ), 
+       x = expression(lambda), y = "density")
 
 
-### 予測分布(スチューデントのt分布)の計算 -----
+### ・予測分布(スチューデントのt分布)の計算 -----
 
 # 予測分布のパラメータを計算:式(3.79)
-mu_st <- mu
+mu_st         <- mu
 lambda_st_hat <- a_hat / b_hat
-nu_st_hat <- 2 * a_hat
+nu_st_hat     <- 2 * a_hat
 #lambda_st_hat <- (N + 2 * a) / (sum((x_n - mu)^2) + 2 * b)
-#nu_st_hat <- N + 2 * a
+#nu_st_hat     <- N + 2 * a
 
 
 # 予測分布を計算:式(3.76)
-predict_df <- tibble(
-  x = x_vec, # x軸の値
-  ln_C_St = lgamma(0.5 * (nu_st_hat + 1)) - lgamma(0.5 * nu_st_hat), # 正規化項(対数)
-  ln_term1 = 0.5 * log(lambda_st_hat / pi / nu_st_hat), 
-  ln_term2 = - 0.5 * (nu_st_hat + 1) * log(1 + lambda_st_hat / nu_st_hat * (x - mu_st)^2), 
-  density = exp(ln_C_St + ln_term1 + ln_term2) # 確率密度
+predict_df <- tibble::tibble(
+  x = x_vec, # 確率変数
+  dens = LaplacesDemon::dst(x = x_vec, mu = mu_st, sigma = 1/sqrt(lambda_st_hat), nu = nu_st_hat) # 確率密度
 )
 
 # 予測分布を作図
 ggplot() + 
-  geom_line(data = predict_df, aes(x = x, y = density), 
-            color = "purple") + # 予測分布
-  geom_line(data = model_df, aes(x = x, y = density), 
-            color = "red", linetype = "dashed") + # 真の分布
+  geom_line(data = model_df, mapping = aes(x = x, y = dens, color = "model"), 
+            size = 1, linetype = "dashed") + # 真の分布
+  geom_line(data = predict_df, mapping = aes(x = x, y = dens, color = "predict"), 
+            size = 1) + # 予測分布
+  scale_color_manual(values = c(model = "red", predict = "purple"), 
+                     labels = c(model = "true model", predict = "predict"), name = "") + # 線の色:(凡例表示用)
+  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c("dashed", "solid")))) + # 凡例の体裁:(凡例表示用)
   labs(title = "Student's t Distribution", 
-       subtitle = paste0("N=", N, 
-                         ", mu_s=", mu_st, 
-                         ", lambda_s_hat=", round(lambda_st_hat, 5), 
-                         ", nu_s_hat=", nu_st_hat))
+       subtitle = parse(
+         text = paste0(
+           "list(N==", N, ", mu[s]==", round(mu_st, 2), 
+           ", hat(lambda)[s]==", round(lambda_st_hat, 5), ", hat(nu)[s]==", nu_st_hat, ")"
+         )
+       ), 
+       x = "x", y = "density")
 
 
-# ・アニメーションによる推移の確認 ---------------------------------------------------------------
+# アニメーションによる学習推移の可視化 ----------------------------------------------------
 
-# 3.3.2項で利用するパッケージ
-library(tidyverse)
-library(gganimate)
+### ・モデルの設定 -----
 
-
-### モデルの設定 -----
-
-# (既知の)パラメータを指定
+# 既知のパラメータを指定
 mu <- 25
 
 # 真の精度パラメータを指定
 lambda_truth <- 0.01
 
-
 # lambdaの事前分布のパラメータを指定
 a <- 1
 b <- 1
 
-
-# 作図用のlambdaの値を作成
-lambda_vec <- seq(0, 4 * lambda_truth, length.out = 1000)
-
-# lambdaの事前分布(ガンマ分布)を計算:式(2.56)
-posterior_df <- tibble(
-  lambda = lambda_vec, # x軸の値
-  density = dgamma(x = lambda, shape = a, rate = b), # 確率密度
-  label = as.factor(paste0("N=", 0, ", a=", a, ", b=", b)) # フレーム切替用のラベル
-)
-
-
-# 初期値による予測分布のパラメータを計算:式(3.79)
-mu_st <- mu
-lambda_st <- a / b
-nu_st <- 2 * a
-
-# 作図用のxの値を作成
-x_vec <- seq(
-  mu - 4 * sqrt(1 / lambda_truth), 
-  mu + 4 * sqrt(1 / lambda_truth), 
-  length.out = 1000
-)
-
-# 初期値による予測分布(スチューデントのt分布)を計算:式(3.76)
-predict_df <- tibble(
-  x = x_vec, # x軸の値
-  ln_C_St = lgamma(0.5 * (nu_st + 1)) - lgamma(0.5 * nu_st), # 正規化項(対数)
-  ln_term1 = 0.5 * log(lambda_st / pi / nu_st), 
-  ln_term2 = - 0.5 * (nu_st + 1) * log(1 + lambda_st / nu_st * (x - mu_st)^2), 
-  density = exp(ln_C_St + ln_term1 + ln_term2), # 確率密度
-  label = as.factor(
-    paste0("N=", 0, ", mu_s=", mu_st, ", lambda_s=", lambda_st, ", nu_s", nu_st)
-  ) # フレーム切替用のラベル
-)
-
-
-### 推論処理 -----
-
 # データ数(試行回数)を指定
 N <- 100
 
+
+# グラフ用のlambdaの値を作成
+lambda_vec <- seq(0, lambda_truth * 5, length.out = 501)
+
+# グラフ用のxの値を作成
+x_vec <- seq(
+  mu - 1/sqrt(lambda_truth) * 4, 
+  mu + 1/sqrt(lambda_truth) * 4, 
+  length.out = 501
+)
+
+
+### ・推論処理：for関数による処理 -----
+
+# lambdaの事前分布(ガンマ分布)を計算:式(2.56)
+anime_posterior_df <- tibble::tibble(
+  lambda = lambda_vec, # 確率変数
+  dens = dgamma(x = lambda_vec, shape = a, rate = b), # 確率密度
+  param = paste0("N=", 0, ", a=", a, ", b=", b) |> 
+    as.factor() # フレーム切替用ラベル
+)
+
+# 初期値による予測分布のパラメータを計算:式(3.79)
+mu_st     <- mu
+lambda_st <- a / b
+nu_st     <- 2 * a
+
+# 初期値による予測分布(スチューデントのt分布)を計算:式(3.76)
+anime_predict_df <- tibble::tibble(
+  x = x_vec, # 確率変数
+  dens = LaplacesDemon::dst(x = x_vec, mu = mu_st, sigma = 1/sqrt(lambda_st), nu = nu_st), # 確率密度
+  param = paste0("N=", 0, ", mu_s=", mu_st, ", lambda_s=", round(lambda_st, 5), ", nu_s=", round(nu_st, 2)) |> 
+    as.factor() # フレーム切替用ラベル
+)
+
+
 # 観測データの受け皿を作成
-x_n <- rep(0, N)
+x_n <- rep(NA, times = N)
 
 # ベイズ推論
 for(n in 1:N){
   
   # ガウス分布に従うデータを生成
-  x_n[n] <- rnorm(n = 1, mean = mu, sd = sqrt(1 / lambda_truth))
+  x_n[n] <- rnorm(n = 1, mean = mu, sd = 1/sqrt(lambda_truth))
   
   # lambdaの事後分布のパラメータを更新:式(3.69)
   a <- 1 / 2 + a
   b <- 0.5 * (x_n[n] - mu)^2 + b
   
   # lambdaの事後分布(ガンマ分布)を計算:式(2.56)
-  tmp_posterior_df <- tibble(
-    lambda = lambda_vec, # x軸の値
-    density = dgamma(x = lambda, shape = a, rate = b), # 確率密度
-    label = as.factor(
-      paste0("N=", n, ", a_hat=", a, ", b_hat=", round(b, 1))
-    ) # フレーム切替用のラベル
+  tmp_posterior_df <- tibble::tibble(
+    lambda = lambda_vec, # 確率変数
+    dens = dgamma(x = lambda, shape = a, rate = b), # 確率密度
+    param = paste0("N=", n, ", a=", a, ", b=", round(b, 1)) |> 
+      as.factor() # フレーム切替用ラベル
   )
   
   # 予測分布のパラメータを更新:式(3.79)
-  mu_st <- mu
+  mu_st     <- mu
   lambda_st <- a / b
-  nu_st <- 2 * a
+  nu_st     <- 2 * a
   
   # 予測分布(スチューデントのt分布)を計算:式(3.76)
-  tmp_predict_df <- tibble(
-    x = x_vec, # x軸の値
-    ln_C_St = lgamma(0.5 * (nu_st + 1)) - lgamma(0.5 * nu_st), # 正規化項(対数)
-    ln_term1 = 0.5 * log(lambda_st / pi / nu_st), 
-    ln_term2 = - 0.5 * (nu_st + 1) * log(1 + lambda_st / nu_st * (x - mu_st)^2), 
-    density = exp(ln_C_St + ln_term1 + ln_term2), # 確率密度
-    label = as.factor(
-      paste0(
-        "N=", n, ", mu_s=", mu_st, ", lambda_s_hat=", round(lambda_st, 5), ", nu_s_hat=", nu_st
-      )
-    ) # フレーム切替用のラベル
+  tmp_predict_df <- tibble::tibble(
+    x = x_vec, # 確率変数
+    dens = LaplacesDemon::dst(x = x_vec, mu = mu_st, sigma = 1/sqrt(lambda_st), nu = nu_st), # 確率密度
+    param = paste0("N=", n, ", mu_s=", mu_st, ", lambda_s=", round(lambda_st, 5), ", nu_s=", round(nu_st, 2)) |> 
+      as.factor() # フレーム切替用ラベル
   )
   
-  # n回目の結果を結合
-  posterior_df <- rbind(posterior_df, tmp_posterior_df)
-  predict_df <- rbind(predict_df, tmp_predict_df)
+  # 推論結果を結合
+  anime_posterior_df <- rbind(anime_posterior_df, tmp_posterior_df)
+  anime_predict_df   <- rbind(anime_predict_df, tmp_predict_df)
 }
 
 # 観測データを確認
 summary(x_n)
 
 
-### 作図処理 -----
+### ・推論処理：tidyverseパッケージによる処理 -----
 
-# 観測データフレームを作成
-label_list <- unique(posterior_df[["label"]]) # ラベルを抽出
-data_df <- tibble(lambda_n = NA, label = label_list[1]) # 初期値
-for(n in 1:N) {
-  # n回目までの観測データ
-  tmp_df <- tibble(
-    lambda_n = 1 / x_n[1:n]^2, # 2乗の逆数に変換
-    label = label_list[n + 1] # フレーム切替用のラベル
-  )
-  
-  # 結合
-  data_df <- rbind(data_df, tmp_df)
-}
+# ガウス分布に従うデータを生成
+x_n <- rnorm(n = N, mean = mu, sd = 1/sqrt(lambda_truth))
 
-# lambdaの事後分布を作図
-posterior_graph <- ggplot(posterior_df, aes(x = lambda, y = density)) + 
-  geom_line(color = "purple") + # lambdaの事後分布
-  geom_vline(aes(xintercept = lambda_truth), 
-             color = "red", linetype = "dashed") + # 真の値
-  geom_point(data = data_df, aes(x = lambda_n, y = 0)) + # 観測データ
-  gganimate::transition_manual(label) + # フレーム
-  labs(title = "Gamma Distribution", 
-       subtitle = "{current_frame}", 
-       x = expression(lambda))
-
-# gif画像を出力
-gganimate::animate(posterior_graph, nframes = N + 1, fps = 10)
+# 試行ごとに事後分布(ガンマ分布)を計算
+anime_posterior_df <- tidyr::expand_grid(
+  n = 0:N, # 試行回数
+  lambda = lambda_vec # 確率変数
+) |> # 全ての組み合わせを作成
+  dplyr::mutate(
+    a = 0.5*n + a, 
+    b = c(b, 0.5*cumsum((x_n - mu)^2) + b)[n+1]
+  ) |> # 事後分布のパラメータを計算:式(3.69)
+  dplyr::mutate(
+    dens = dgamma(x = lambda, shape = a, rate = b), # 確率密度
+    param = paste0("N=", n, ", a=", a, ", b=", round(b, 1)) |> 
+      (\(.){factor(., levels = unique(.))})() # フレーム切替用ラベル
+  ) # 事後分布を計算:式(2.56)
 
 
-# 尤度を計算:式(2.64)
-model_df <- tibble(
-  x = x_vec, # x軸の値
-  density = dnorm(x, mean = mu, sd = sqrt(1 / lambda_truth)) # 確率密度
+# 試行ごとに予測分布(スチューデントのt分布)を計算
+anime_predict_df <- tidyr::expand_grid(
+  n = 0:N, # 試行回数
+  x = x_vec # 確率変数
+) |> # 全ての組み合わせを作成
+  dplyr::mutate(
+    mu_st = mu, 
+    lambda_st = c(a/b, (1:N + 2*a) / (cumsum((x_n - mu)^2) + 2*b))[n+1], 
+    nu_st = n + 2*a
+  ) |> # 予測分布のパラメータを計算:式(3.79)
+  dplyr::mutate(
+    dens = LaplacesDemon::dst(x = x_vec, mu = mu_st, sigma = 1/sqrt(lambda_st), nu = nu_st), # 確率密度
+    param = paste0("N=", n, ", mu_s=", mu_st, ", lambda_s=", round(lambda_st, 5), ", nu_s=", round(nu_st, 2)) |> 
+      (\(.){factor(., levels = unique(.))})() # フレーム切替用ラベル
+  ) # 事後分布を計算:式(3.76)
+
+
+### ・作図処理 -----
+
+# 観測データを格納
+anime_data_df <- tibble::tibble(
+  scaled_x = c(NA, 1/x_n^2), # 2乗の逆数に変換
+  param = unique(anime_posterior_df[["param"]]) # フレーム切替用ラベル
 )
 
-# 観測データフレームを作成
-label_list <- unique(predict_df[["label"]]) # ラベルを抽出
-data_df <- tibble(x_n = NA, label = label_list[1]) # 初期値
-for(n in 1:N) {
-  # n回目までの観測データ
-  tmp_df <- tibble(
-    x_n = x_n[1:n], 
-    label = label_list[n + 1] # フレーム切替用のラベル
-  )
-  
-  # 結合
-  data_df <- rbind(data_df, tmp_df)
-}
-
-# 予測分布を作図
-predict_graph <- ggplot() + 
-  geom_line(data = predict_df, aes(x = x, y = density), 
-            color = "purple") + # 予測分布
-  geom_line(data = model_df, aes(x = x, y = density), 
-            color = "red", linetype = "dashed") + # 真の分布
-  geom_point(data = data_df, aes(x = x_n, y = 0)) + # 観測データ
-  gganimate::transition_manual(label) + # フレーム
-  ylim(c(0, 0.1)) + # y軸の表示範囲
-  labs(title = "Student's t Distribution", 
-       subtitle = "{current_frame}")
+# lambdaの事後分布のアニメーションを作図
+posterior_graph <- ggplot() + 
+  geom_vline(mapping = aes(xintercept = lambda_truth, color = "param"), 
+             size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
+  geom_line(data = anime_posterior_df, mapping = aes(x = lambda, y = dens, color = "posterior"), 
+            size = 1) + # muの事後分布
+  geom_point(data = anime_data_df, mapping = aes(x = scaled_x, y = 0, color = "data"), 
+             size = 6) + # 観測データ
+  gganimate::transition_manual(param) + # フレーム
+  scale_color_manual(breaks = c("param", "posterior", "data"), 
+                     values = c("red", "purple", "pink"), 
+                     labels = c("true parameter", "posterior", "observation data"), name = "") + # 線の色:(凡例表示用)
+  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5, 3), 
+                                                  linetype = c("dashed", "solid", "blank"), 
+                                                  shape = c(NA, NA, 19)))) + # 凡例の体裁:(凡例表示用)
+  coord_cartesian(xlim = c(0, max(lambda_vec))) + # 軸の表示範囲
+  labs(title = "Gamma Distribution", 
+       subtitle = "{current_frame}", 
+       x = expression(lambda), y = "density")
 
 # gif画像を出力
-gganimate::animate(predict_graph, nframes = N + 1, fps = 10)
+gganimate::animate(posterior_graph, nframes = N+1+10, end_pause = 10, fps = 10, width = 800, height = 600)
+
+
+# 真の分布を計算
+model_df <- tibble::tibble(
+  x = x_vec, # 確率変数
+  dens = dnorm(x, mean = mu, sd = 1/sqrt(lambda_truth)) # 確率密度
+)
+
+# 観測データを格納
+anime_data_df <- tibble::tibble(
+  x = c(NA, x_n), 
+  param = unique(anime_predict_df[["param"]]) # フレーム切替用ラベル
+)
+
+# 過去の観測データを複製
+anime_alldata_df <- tidyr::expand_grid(
+  frame = 1:N, # フレーム番号
+  n = 1:N # 試行回数
+) |> # 全ての組み合わせを作成
+  dplyr::filter(n < frame) |> # フレーム番号以前のデータを抽出
+  dplyr::mutate(
+    x = x_n[n], 
+    param = unique(anime_predict_df[["param"]])[frame+1]
+  ) # 対応するデータとラベルを抽出
+
+# 予測分布のアニメーションを作図
+predict_graph <- ggplot() + 
+  geom_line(data = model_df, mapping = aes(x = x, y = dens, color = "model"), 
+            size = 1, linetype = "dashed") + # 真の分布
+  geom_line(data = anime_predict_df, mapping = aes(x = x, y = dens, color = "predict"), 
+            size = 1) + # 予測分布
+  geom_point(data = anime_alldata_df, mapping = aes(x = x, y = 0), 
+             color = "pink", alpha = 0.5, size = 3) + # 過去の観測データ
+  geom_point(data = anime_data_df, mapping = aes(x = x, y = 0, color = "data"), 
+             size = 6) + # 観測データ
+  gganimate::transition_manual(param) + # フレーム
+  scale_color_manual(breaks = c("model", "predict", "data"), 
+                     values = c("red", "purple", "pink"), 
+                     labels = c("true model", "predict", "observation data"), name = "") + # 線の色:(凡例表示用)
+  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5, 3), 
+                                                  linetype = c("dashed", "solid", "blank"), 
+                                                  shape = c(NA, NA, 19)))) + # 凡例の体裁:(凡例表示用)
+  coord_cartesian(ylim = c(0, max(model_df[["dens"]])*2)) + # 軸の表示範囲
+  labs(title = "Student's t Distribution", 
+       subtitle = "{current_frame}", 
+       x = "x", y = "density")
+
+# gif画像を出力
+gganimate::animate(predict_graph, nframes = N+1+10, end_pause=10, fps = 10, width = 800, height = 600)
 
 
