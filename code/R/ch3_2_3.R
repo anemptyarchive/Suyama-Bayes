@@ -7,30 +7,29 @@ library(gganimate)
 
 # チェック用
 library(ggplot2)
-library(magrittr)
 
 
 # ベイズ推論の実装 -------------------------------------------------------------------
 
-### ・尤度(ポアソン分布)の設定 -----
+### ・生成分布(ポアソン分布)の設定 -----
 
 # 真のパラメータを指定
 lambda_truth <- 4
 
 
 # グラフ用のxの値を作成
-x_vec <- seq(0, lambda_truth*4)
+x_vec <- seq(0, lambda_truth*3)
 
-# 尤度を計算:式(2.37)
+# 真の分布を計算:式(2.37)
 model_df <- tibble::tibble(
-  x = x_vec, # x軸の値
-  prob = dpois(x = x, lambda = lambda_truth) # 確率
+  x = x_vec, # 確率変数
+  prob = dpois(x = x_vec, lambda = lambda_truth) # 確率
 )
 
-# 尤度を作図
+# 真の分布を作図
 ggplot() + 
   geom_bar(data = model_df, mapping = aes(x = x, y = prob, fill = "model"), 
-           stat = "identity") + # 尤度
+           stat = "identity") + # 真の分布
   scale_fill_manual(breaks = "model", values = "purple", labels = "true model", name = "") + # バーの色:(凡例表示用)
   scale_x_continuous(breaks = x_vec, minor_breaks = FALSE) + # x軸目盛
   labs(title = "Poisson Distribution", 
@@ -53,8 +52,9 @@ freq_df <- tidyr::tibble(x = x_n) |> # 観測データを格納
 
 # ラベル用に度数を整形
 freq_vec <- freq_df |> 
-  dplyr::right_join(tidyr::tibble(x = x_vec), by = "x") |> # x軸の全ての値に結合
+  dplyr::right_join(tidyr::tibble(x = x_vec), by = "x") |> # グラフ用の値に結合
   dplyr::mutate(freq = tidyr::replace_na(freq, 0)) |> # 観測にない場合の欠損値を0に置換
+  dplyr::arrange(x) |> # 昇順に並べ替え
   dplyr::pull(freq) # ベクトルとして抽出
 
 # 観測データのヒストグラムを作成
@@ -67,7 +67,7 @@ ggplot() +
                     labels = c(model = "true model", data = "observation data"), name = "") + # バーの色:(凡例表示用)
   scale_color_manual(values = c(model = "red", data = "pink"), 
                      labels = c(model = "true model", data = "observation data"), name = "") + # 線の色:(凡例表示用)
-  guides(color = guide_legend(override.aes = list(size = c(1, 1), linetype = c(2, 1)))) + # 凡例の体裁:(凡例表示用)
+  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c(2, 1)))) + # 凡例の体裁:(凡例表示用)
   scale_x_continuous(breaks = 0:max(c(x_vec, x_n)), minor_breaks = FALSE) + # x軸目盛
   labs(title = "Poisson Distribution", 
        subtitle = parse(text = paste0("list(lambda==", lambda_truth, ", N==", N, "(", paste0(freq_vec, collapse = ", "), "))")), 
@@ -82,12 +82,12 @@ b <- 1
 
 
 # グラフ用のlambdaの値を作成
-lambda_vec <- seq(0, lambda_truth*2, length.out = 501)
+lambda_vec <- seq(0, lambda_truth*3, length.out = 501)
 
 # 事前分布を計算:式(2.56)
 prior_df <- tibble::tibble(
-  lambda = lambda_vec, # x軸の値
-  dens = dgamma(x = lambda, shape = a, rate = b) # 確率密度
+  lambda = lambda_vec, # 確率変数
+  dens = dgamma(x = lambda_vec, shape = a, rate = b) # 確率密度
 )
 
 # 事前分布を作図
@@ -98,7 +98,7 @@ ggplot() +
              size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
   scale_color_manual(values = c(param = "red", prior = "purple"), 
                      labels = c(param = "true parameter", prior = "prior"), name = "") + # 線の色:(凡例表示用)
-  guides(color = guide_legend(override.aes = list(size = c(0.8, 0.8), linetype = c(2, 1)))) + # 凡例の体裁:(凡例表示用)
+  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c(2, 1)))) + # 凡例の体裁:(凡例表示用)
   labs(title = "Gamma Distribution", 
        subtitle = parse(text = paste0("list(a==", a, ", b==", b, ")"),), 
        x = expression(lambda), y = "density")
@@ -113,8 +113,8 @@ b_hat <- N + b
 
 # 事後分布を計算:式(2.56)
 posterior_df <- tibble::tibble(
-  lambda = lambda_vec, # x軸の値
-  dens = dgamma(x = lambda, shape = a_hat, rate = b_hat) # 確率密度
+  lambda = lambda_vec, # 確率変数
+  dens = dgamma(x = lambda_vec, shape = a_hat, rate = b_hat) # 確率密度
 )
 
 # 事後分布を作図
@@ -125,7 +125,7 @@ ggplot() +
              size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
   scale_color_manual(values = c(param = "red", posterior = "purple"), 
                      labels = c(param = "true parameter", posterior = "posterior"), name = "") + # 線の色:(凡例表示用)
-  guides(color = guide_legend(override.aes = list(size = c(0.8, 0.8), linetype = c(2, 1)))) + # 凡例の体裁:(凡例表示用)
+  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c(2, 1)))) + # 凡例の体裁:(凡例表示用)
   labs(title = "Gamma Distribution", 
        subtitle = parse(text = paste0("list(N==", N, ", hat(a)==", a_hat, ", hat(b)==", b_hat, ")")), 
        x = expression(lambda), y = "density")
@@ -142,8 +142,8 @@ p_hat <- 1 / (b_hat + 1)
 
 # 予測分布を計算:式(3.43)
 predict_df <- tibble::tibble(
-  x = x_vec, # x軸の値
-  prob = dnbinom(x = x, size = r_hat, prob = 1-p_hat) # 確率
+  x = x_vec, # 確率変数
+  prob = dnbinom(x = x_vec, size = r_hat, prob = 1-p_hat) # 確率
 )
 
 # 予測分布を作図
@@ -156,7 +156,7 @@ ggplot() +
                     labels = c(model = "true model", predict = "predict"), name = "") + # バーの色:(凡例表示用)
   scale_color_manual(values = c(model = "red", predict ="purple"), 
                      labels = c(model = "true model", predict = "predict"), name = "") + # 線の色:(凡例表示用)
-  guides(color = guide_legend(override.aes = list(linetype = c(2, 1)))) + # 凡例の体裁:(凡例表示用)
+  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c(2, 1)))) + # 凡例の体裁:(凡例表示用)
   scale_x_continuous(breaks = x_vec, minor_breaks = FALSE) + # x軸目盛
   labs(title = "Negative Binomial Distribution", 
        subtitle = parse(text = paste0("list(N==", N, ", hat(r)==", r_hat, ", hat(p)==", round(p_hat, 3), ")")), 
@@ -175,7 +175,7 @@ a <- 1
 b <- 1
 
 # データ数(試行回数)を指定
-N <- 300
+N <- 100
 
 
 # グラフ用のlambdaの値を作成
@@ -189,8 +189,8 @@ x_vec <- seq(0, lambda_truth*3)
 
 # 事前分布(ガンマ分布)を計算
 anime_posterior_df <- tibble::tibble(
-  lambda = lambda_vec, # x軸の値
-  dens = dgamma(x = lambda, shape = a, rate = b), # 確率密度
+  lambda = lambda_vec, # 確率変数
+  dens = dgamma(x = lambda_vec, shape = a, rate = b), # 確率密度
   param = paste0("N=", 0, "=(", paste0(rep(0, times = length(x_vec)), collapse = ", "), "), a=", a, ", b=", b) |> 
     as.factor() # フレーム切替用ラベル
 )
@@ -201,8 +201,8 @@ p <- 1 / (b + 1)
 
 # 初期値による予測分布(負の二項分布)を計算
 anime_predict_df <- tibble::tibble(
-  x = x_vec, # x軸の値
-  prob = dnbinom(x = x, size = r, prob = 1 - p), # 確率
+  x = x_vec, # 確率変数
+  prob = dnbinom(x = x_vec, size = r, prob = 1-p), # 確率
   param = paste0("N=", 0, "=(", paste0(rep(0, times = length(x_vec)), collapse = ", "), "), r=", r, ", p=", round(p, 5)) |> 
     as.factor() # フレーム切替用ラベル
 )
@@ -220,7 +220,7 @@ for(n in 1:N){
   # 観測データを集計
   freq_vec <- tidyr::tibble(x = x_n[1:n]) |> # 観測データを格納
     dplyr::count(x, name = "freq") |> # 度数を集計
-    dplyr::right_join(tidyr::tibble(x = x_vec), by = "x") |> # x軸の全ての値に結合
+    dplyr::right_join(tidyr::tibble(x = x_vec), by = "x") |> # グラフ用の値に結合
     dplyr::mutate(freq = tidyr::replace_na(freq, 0)) |> # 観測にない場合の欠損値を0に置換
     dplyr::arrange(x) |> # 昇順に並べ替え
     dplyr::pull(freq) # ベクトルとして抽出
@@ -231,8 +231,8 @@ for(n in 1:N){
   
   # 事後分布(ガンマ分布)を計算:式(2.56)
   tmp_posterior_df <- tibble::tibble(
-    lambda = lambda_vec, # x軸の値
-    dens = dgamma(x = lambda, shape = a, rate = b), # 確率密度
+    lambda = lambda_vec, # 確率変数
+    dens = dgamma(x = lambda_vec, shape = a, rate = b), # 確率密度
     param = paste0("N=", n, "=(", paste0(freq_vec, collapse = ", "), "), a=", a, ", b=", b) |> 
       as.factor() # フレーム切替用ラベル
   )
@@ -243,8 +243,8 @@ for(n in 1:N){
   
   # 予測分布(負の二項分布)を計算:式(3.43)
   tmp_predict_df <- tibble::tibble(
-    x = x_vec, # x軸の値
-    prob = dnbinom(x = x, size = r, prob = 1-p), # 確率
+    x = x_vec, # 確率変数
+    prob = dnbinom(x = x_vec, size = r, prob = 1-p), # 確率
     param = paste0("N=", n, "=(", paste0(freq_vec, collapse = ", "), "), r=", r, ", p=", round(p, 3)) |> 
       as.factor() # フレーム切替用のラベル
   )
@@ -287,22 +287,22 @@ freq_vec <- tibble::tibble(
 # 試行ごとに事後分布(ガンマ分布)を計算
 anime_posterior_df <- tidyr::expand_grid(
   n = 0:N, # 試行回数
-  lambda = lambda_vec # x軸の値
-) |> 
+  lambda = lambda_vec # 確率変数
+) |> # 全ての組み合わせを作成
   dplyr::mutate(
     a = c(a, cumsum(x_n) + a)[n+1], 
     b = n + b
   ) |> # 事後分布のパラメータを計算:式(3.38)
   dplyr::mutate(
     dens = dgamma(x = lambda, shape = a, rate = b), # 確率密度
-    param = paste0("N=", n, "=(", freq_vec[n+1], "), a=", a, ", b=", b) %>% 
-      factor(., levels = unique(.)) # フレーム切替用ラベル
+    param = paste0("N=", n, "=(", freq_vec[n+1], "), a=", a, ", b=", b) |> 
+      (\(.){factor(., levels = unique(.))})() # フレーム切替用ラベル
   ) # 事後分布を計算:式(2.56)
 
 # 試行ごとに予測分布(負の二項分布)を計算
 anime_predict_df <- tidyr::expand_grid(
   n = 0:N, # 試行回数
-  x = x_vec # x軸の値
+  x = x_vec # 確率変数
 ) |> 
   dplyr::mutate(
     r = c(a, cumsum(x_n) + a)[n+1], 
@@ -310,8 +310,8 @@ anime_predict_df <- tidyr::expand_grid(
   ) |> # 予測分布のパラメータを計算算:式(3.44)
   dplyr::mutate(
     prob = dnbinom(x = x, size = r, prob = 1-p), # 確率
-    param = paste0("N=", n, "=(", freq_vec[n+1], "), r=", r, ", p=", round(p, 3)) %>% 
-      factor(., levels = unique(.)) # フレーム切替用ラベル
+    param = paste0("N=", n, "=(", freq_vec[n+1], "), r=", r, ", p=", round(p, 3)) |> 
+      (\(.){factor(., levels = unique(.))})() # フレーム切替用ラベル
   ) # 予測分布を計算:式(3.43)
 
 
@@ -346,7 +346,7 @@ gganimate::animate(posterior_graph, nframes = N+1, fps = 10, width = 800, height
 
 # 尤度をフレーム分に複製
 anime_model_df <- tibble::tibble(
-  x = rep(x_vec, times = N+1), # x軸の値
+  x = rep(x_vec, times = N+1), # 確率変数
   prob = rep(dpois(x = x_vec, lambda = lambda_truth), times = N+1), # 確率
   param = anime_predict_df[["param"]] # フレーム切替用ラベル
 )

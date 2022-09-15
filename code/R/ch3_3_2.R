@@ -14,7 +14,7 @@ library(ggplot2)
 
 ### ・生成分布(ガウス分布)の設定 -----
 
-# 既知のパラメータを指定
+# 既知の平均パラメータを指定
 mu <- 25
 
 # 真の精度パラメータを指定
@@ -32,7 +32,7 @@ x_vec <- seq(
 # 真の分布を計算:式(2.64)
 model_df <- tibble::tibble(
   x = x_vec, # 確率変数
-  dens = dnorm(x, mean = mu, sd = 1/sqrt(lambda_truth)) # 確率密度
+  dens = dnorm(x = x_vec, mean = mu, sd = 1/sqrt(lambda_truth)) # 確率密度
 )
 
 # 真の分布を作図
@@ -60,7 +60,7 @@ data_df <- tibble::tibble(x = x_n)
 
 # 観測データのヒストグラムを作成
 ggplot() + 
-  geom_histogram(data = data_df, aes(x = x, y = ..density.., fill = "data"), 
+  geom_histogram(data = data_df, mapping = aes(x = x, y = ..density.., fill = "data"), 
                  bins = 30) + # 観測データ(密度)
   geom_line(data = model_df, mapping = aes(x = x, y = dens, color = "model"), 
             size = 1, linetype = "dashed") + # 真の分布
@@ -76,26 +76,26 @@ ggplot() +
 
 ### ・事前分布(ガンマ分布)の設定 -----
 
-# lambdaの事前分布のパラメータを指定
+# λの事前分布のパラメータを指定
 a <- 1
 b <- 1
 
 
-# グラフ用のlambdaの値を作成
+# グラフ用のλの値を作成
 lambda_vec <- seq(0, lambda_truth * 4, length.out = 501)
 
-# lambdaの事前分布を計算:式(2.56)
+# λの事前分布を計算:式(2.56)
 prior_df <- tibble::tibble(
   lambda = lambda_vec, # 確率変数
   dens = dgamma(x = lambda_vec, shape = a, rate = b) # 確率密度
 )
 
-# lambdaの事前分布を作図
+# λの事前分布を作図
 ggplot() + 
   geom_vline(mapping = aes(xintercept = lambda_truth, color = "param"), 
              size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
   geom_line(data = prior_df, mapping = aes(x = lambda, y = dens, color = "prior"), 
-            size = 1) + # muの事前分布
+            size = 1) + # λの事前分布
   scale_color_manual(values = c(param = "red", prior = "purple"), 
                      labels = c(param = "true parameter", prior = "prior"), name = "") + # 線の色:(凡例表示用)
   guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c("dashed", "solid")))) + # 凡例の体裁:(凡例表示用)
@@ -106,23 +106,23 @@ ggplot() +
 
 ### ・事後分布(ガンマ分布)の計算 -----
 
-# lambdaの事後分布のパラメータを計算:式(3.69)
+# λの事後分布のパラメータを計算:式(3.69)
 a_hat <- 0.5 * N + a
 b_hat <- 0.5 * sum((x_n - mu)^2) + b
 
 
-# lambdaの事後分布を計算:式(2.56)
+# λの事後分布を計算:式(2.56)
 posterior_df <-tibble:: tibble(
   lambda = lambda_vec, # 確率変数
   dens = dgamma(x = lambda_vec, shape = a_hat, rate = b_hat) # 確率密度
 )
 
-# lambdaの事後分布を作図
+# λの事後分布を作図
 ggplot() + 
   geom_vline(aes(xintercept = lambda_truth, color = "param"), 
              size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
   geom_line(data = posterior_df, mapping = aes(x = lambda, y = dens, color = "posterior"), 
-            size = 1) + # muの事後分布
+            size = 1) + # λの事後分布
   scale_color_manual(values = c(param = "red", posterior = "purple"), 
                      labels = c(param = "true parameter", posterior = "posterior"), name = "") + # 線の色:(凡例表示用)
   guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), 
@@ -179,7 +179,7 @@ mu <- 25
 # 真の精度パラメータを指定
 lambda_truth <- 0.01
 
-# lambdaの事前分布のパラメータを指定
+# λの事前分布のパラメータを指定
 a <- 1
 b <- 1
 
@@ -187,7 +187,7 @@ b <- 1
 N <- 100
 
 
-# グラフ用のlambdaの値を作成
+# グラフ用のλの値を作成
 lambda_vec <- seq(0, lambda_truth * 5, length.out = 501)
 
 # グラフ用のxの値を作成
@@ -200,7 +200,7 @@ x_vec <- seq(
 
 ### ・推論処理：for関数による処理 -----
 
-# lambdaの事前分布(ガンマ分布)を計算:式(2.56)
+# λの事前分布(ガンマ分布)を計算:式(2.56)
 anime_posterior_df <- tibble::tibble(
   lambda = lambda_vec, # 確率変数
   dens = dgamma(x = lambda_vec, shape = a, rate = b), # 確率密度
@@ -231,11 +231,11 @@ for(n in 1:N){
   # ガウス分布に従うデータを生成
   x_n[n] <- rnorm(n = 1, mean = mu, sd = 1/sqrt(lambda_truth))
   
-  # lambdaの事後分布のパラメータを更新:式(3.69)
+  # λの事後分布のパラメータを更新:式(3.69)
   a <- 1 / 2 + a
   b <- 0.5 * (x_n[n] - mu)^2 + b
   
-  # lambdaの事後分布(ガンマ分布)を計算:式(2.56)
+  # λの事後分布(ガンマ分布)を計算:式(2.56)
   tmp_posterior_df <- tibble::tibble(
     lambda = lambda_vec, # 確率変数
     dens = dgamma(x = lambda, shape = a, rate = b), # 確率密度
@@ -307,16 +307,16 @@ anime_predict_df <- tidyr::expand_grid(
 
 # 観測データを格納
 anime_data_df <- tibble::tibble(
-  scaled_x = c(NA, 1/x_n^2), # 2乗の逆数に変換
+  scaled_x = c(NA, 1/(x_n - mu)^2), # 偏差の2乗の逆数に変換
   param = unique(anime_posterior_df[["param"]]) # フレーム切替用ラベル
 )
 
-# lambdaの事後分布のアニメーションを作図
+# λの事後分布のアニメーションを作図
 posterior_graph <- ggplot() + 
   geom_vline(mapping = aes(xintercept = lambda_truth, color = "param"), 
              size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
   geom_line(data = anime_posterior_df, mapping = aes(x = lambda, y = dens, color = "posterior"), 
-            size = 1) + # muの事後分布
+            size = 1) + # λの事後分布
   geom_point(data = anime_data_df, mapping = aes(x = scaled_x, y = 0, color = "data"), 
              size = 6) + # 観測データ
   gganimate::transition_manual(param) + # フレーム

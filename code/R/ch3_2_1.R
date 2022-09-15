@@ -12,7 +12,7 @@ library(magrittr)
 
 # ベイズ推論の実装 -------------------------------------------------------------------
 
-### ・尤度(ベルヌーイ分布)の設定 -----
+### ・生成分布(ベルヌーイ分布)の設定 -----
 
 # 真のパラメータを指定
 mu_truth <- 0.25
@@ -21,19 +21,19 @@ mu_truth <- 0.25
 # xがとり得る値を作成
 x_vec <- 0:1
 
-# 尤度を計算:式(2.16)
+# 真の分布を計算:式(2.16)
 model_df <- tibble::tibble(
   x = x_vec, # x軸の値
   prob = c(1 - mu_truth, mu_truth) # 確率
 )
 
-# 尤度を作図
+# 真の分布を作図
 ggplot() + 
   geom_bar(data = model_df, mapping = aes(x = x, y = prob, fill = "model"), 
-           stat = "identity") + # 尤度
+           stat = "identity") + # 真の分布
   scale_fill_manual(breaks = "model", values = "purple", labels = "true model", name = "") + # バーの色:(凡例表示用)
   scale_x_continuous(breaks = x_vec, minor_breaks = FALSE) + # x軸目盛
-  coord_cartesian(ylim = c(0, 1)) + # 軸の表示範囲
+  ylim(c(0, 1)) + # y軸の表示範囲
   labs(title = "Bernoulli Distribution", 
        subtitle = parse(text = paste0("mu==", mu_truth)), 
        x = "x", y = "probability")
@@ -65,7 +65,7 @@ ggplot() +
   scale_color_manual(values = c(model = "red", data = "pink"), 
                      labels = c(model = "true model", data = "observation data"), name = "") + # 線の色:(凡例表示用)
   scale_x_continuous(breaks = x_vec, minor_breaks = FALSE) + # x軸目盛
-  coord_cartesian(ylim = c(0, 1)) + # 軸の表示範囲
+  ylim(c(0, 1)) + # y軸の表示範囲
   labs(title = "Bernoulli Distribution", 
        subtitle = parse(text = paste0("list(mu==", mu_truth, ", N==", N, "(", paste0(freq_df[["freq"]], collapse = ", "), "))")), 
        x = "x", y = "relative frequency")
@@ -145,14 +145,14 @@ predict_df <- tibble::tibble(
 ggplot() + 
   geom_bar(data = predict_df, mapping = aes(x = x, y = prob, fill = "predict"), 
            stat = "identity") + # 予測分布
-  geom_bar(data = model_df, mapping = aes(x = x, y = prob, fill = "predict", color = "model"), 
+  geom_bar(data = model_df, mapping = aes(x = x, y = prob, fill = "color", color = "color"), 
            stat = "identity", size = 1, linetype = "dashed") + # 真の分布
   scale_fill_manual(values = c(model = NA, predict ="purple"), na.value = NA, 
                     labels = c(model = "true model", predict = "predict"), name = "") + # バーの色:(凡例表示用)
   scale_color_manual(values = c(model = "red", predict ="purple"), 
                      labels = c(model = "true model", predict = "predict"), name = "") + # 線の色:(凡例表示用)
   scale_x_continuous(breaks = x_vec, minor_breaks = FALSE) + # x軸目盛
-  coord_cartesian(ylim = c(0, 1)) + # 軸の表示範囲
+  ylim(c(0, 1)) + # y軸の表示範囲
   labs(title = "Bernoulli Distribution", 
        subtitle = parse(text = paste0("list(N==", N, ", hat(mu)[s]==", round(mu_star_hat, 2), ")")), 
        x = "x", y = "probability")
@@ -252,31 +252,17 @@ table(x_n)
 x_n <- rbinom(n = N, size = 1, prob = mu_truth)
 
 # 試行ごとに度数を集計:(ラベル用)
-freq_vec <- tibble::tibble(
-  x = c(NA, x_n), # 観測データ
-  n = 0:N, # 試行回数
-  freq = 1 # 集計用の値
-) |> # 観測データを格納
-  dplyr::right_join(tidyr::expand_grid(x = x_vec, n = 0:N), by = c("x", "n")) |> # グラフ用の値に結合
-  dplyr::mutate(freq = tidyr::replace_na(freq, replace = 0)) |> # 観測にない場合の欠損値を0に置換
-  dplyr::arrange(n, x) |> # 集計用に昇順に並べ替え
-  dplyr::group_by(x) |> # 集計用にグループ化
-  dplyr::mutate(freq = cumsum(freq)) |> # 各試行までの度数を計算
-  dplyr::ungroup() |> # グループ化を解除
-  tidyr::pivot_wider(
-    id_cols = n, 
-    names_from = x, 
-    names_prefix = "x", 
-    values_from = freq
-  ) |> # 度数列を展開
-  tidyr::unite(col = "freq", dplyr::starts_with("x"), sep = ", ") |> # 度数情報をまとめて文字列化
-  dplyr::pull(freq) # ベクトルとして抽出
+freq_vec <- stringr::str_c(
+  0:N - cumsum(c(0, x_n)), 
+  cumsum(c(0, x_n)), 
+  sep = ", "
+)
 
 # 試行ごとに事後分布(ベータ分布)を計算
 anime_posterior_df <- tidyr::expand_grid(
   n = 0:N, # 試行回数
   mu = mu_vec # x軸の値
-) |> 
+) |> # 全ての組み合わせを作成
   dplyr::mutate(
     a = c(a, cumsum(x_n) + a)[n+1], 
     b = c(b, 1:N - cumsum(x_n) + b)[n+1]
@@ -291,7 +277,7 @@ anime_posterior_df <- tidyr::expand_grid(
 anime_predict_df <- tidyr::expand_grid(
   n = 0:N, # 試行回数
   x = x_vec # x軸の値
-) |> 
+) |> # 全ての組み合わせを作成
   dplyr::mutate(
     mu_star = c(a / (a + b), (cumsum(x_n) + a) / (1:N + a + b))[n+1]
   ) |> # 予測分布のパラメータを計算算:式(3.19)
@@ -331,7 +317,7 @@ posterior_graph <- ggplot() +
 gganimate::animate(posterior_graph, nframes = N+1, fps = 10, width = 800, height = 600)
 
 
-# 尤度をフレーム分に複製
+# 真の分布をフレーム分に複製
 anime_model_df <- tibble::tibble(
   x = rep(x_vec, times = N+1), # x軸の値
   prob = rep(c(1 - mu_truth, mu_truth), times = N+1), # 確率
@@ -360,7 +346,7 @@ predict_graph <- ggplot() +
   guides(fill = guide_legend(override.aes = list(fill = c(NA, "purple", NA))), 
          color = guide_legend(override.aes = list(size = c(0.5, 0.5, 5), linetype = c(2, 0, 0), shape = c(NA, NA, 19)))) + # 凡例の体裁:(凡例表示用)
   scale_x_continuous(breaks = x_vec, minor_breaks = FALSE) + # x軸目盛
-  coord_cartesian(ylim = c(0, 1)) + # 軸の表示範囲
+  ylim(c(0, 1)) + # y軸の表示範囲
   labs(title = "Bernoulli Distribution", 
        subtitle = "{current_frame}", 
        x = "x", y = "probability")

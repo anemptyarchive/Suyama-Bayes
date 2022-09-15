@@ -74,33 +74,33 @@ ggplot() +
 
 ### ・事前分布(ガウス分布)の設定 -----
 
-# muの事前分布の平均パラメータを指定
+# μの事前分布の平均パラメータを指定
 m <- 0
 
-# muの事前分布の精度パラメータを指定
+# μの事前分布の精度パラメータを指定
 lambda_mu <- 0.0016
 sqrt(1 / lambda_mu) # 標準偏差
 
 
-# グラフ用のmuの値を作成
+# グラフ用のμの値を作成
 mu_vec <- seq(
   mu_truth - 1/sqrt(lambda_mu) * 4, 
   mu_truth + 1/sqrt(lambda_mu) * 4, 
   length.out = 501
 )
 
-# muの事前分布を計算:式(2.64)
+# μの事前分布を計算:式(2.64)
 prior_df <- tibble::tibble(
   mu = mu_vec, # 確率変数
   dens = dnorm(x = mu_vec, mean = m, sd = 1/sqrt(lambda_mu)) # 確率密度
 )
 
-# muの事前分布を作図
+# μの事前分布を作図
 ggplot() + 
   geom_vline(mapping = aes(xintercept = mu_truth, color = "param"), 
              size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
   geom_line(data = prior_df, mapping = aes(x = mu, y = dens, color = "prior"), 
-            size = 1) + # muの事前分布
+            size = 1) + # μの事前分布
   scale_color_manual(values = c(param = "red", prior = "purple"), 
                      labels = c(param = "true parameter", prior = "prior"), name = "") + # 線の色:(凡例表示用)
   guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c("dashed", "solid")))) + # 凡例の体裁:(凡例表示用)
@@ -111,23 +111,23 @@ ggplot() +
 
 ### ・事後分布(ガウス分布)の計算 -----
 
-# muの事後分布のパラメータを計算:式(3.53),(3.54)
+# μの事後分布のパラメータを計算:式(3.53),(3.54)
 lambda_mu_hat <- N * lambda + lambda_mu
 m_hat         <- (lambda * sum(x_n) + lambda_mu * m) / lambda_mu_hat
 
 
-# muの事後分布を計算:式(2.64)
+# μの事後分布を計算:式(2.64)
 posterior_df <- tibble::tibble(
   mu = mu_vec, # 確率変数
   dens = dnorm(x = mu_vec, mean = m_hat, sd = 1/sqrt(lambda_mu_hat)) # 確率密度
 )
 
-# muの事後分布を作図
+# μの事後分布を作図
 ggplot() + 
   geom_vline(aes(xintercept = mu_truth, color = "param"), 
              size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
   geom_line(data = posterior_df, mapping = aes(x = mu, y = dens, color = "posterior"), 
-            size = 1) + # muの事後分布
+            size = 1) + # μの事後分布
   scale_color_manual(values = c(param = "red", posterior = "purple"), 
                      labels = c(param = "true parameter", posterior = "posterior"), name = "") + # 線の色:(凡例表示用)
   guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c("dashed", "solid")))) + # 凡例の体裁:(凡例表示用)
@@ -178,17 +178,17 @@ mu_truth <- 25
 # 既知の精度パラメータを指定
 lambda <- 0.01
 
-# muの事前分布の平均パラメータを指定
+# μの事前分布の平均パラメータを指定
 m <- 0
 
-# muの事前分布の精度パラメータを指定
+# μの事前分布の精度パラメータを指定
 lambda_mu <- 0.0016
 
 # データ数(試行回数)を指定
 N <- 100
 
 
-# グラフ用のmuの値を作成
+# グラフ用のμの値を作成
 mu_vec <- seq(
   mu_truth - 1/sqrt(lambda_mu) * 2, 
   mu_truth + 1/sqrt(lambda_mu) * 2, 
@@ -205,7 +205,7 @@ x_vec <- seq(
 
 ### ・推論処理：for関数による処理 -----
 
-# muの事前分布(ガウス分布)を計算:式(2.64)
+# μの事前分布(ガウス分布)を計算:式(2.64)
 anime_posterior_df <- tibble::tibble(
   mu = mu_vec, # 確率変数
   dens = dnorm(x = mu_vec, mean = m, sd = 1/sqrt(lambda_mu)), # 確率密度
@@ -235,12 +235,12 @@ for(n in 1:N){
   # ガウス分布に従うデータを生成
   x_n[n] <- rnorm(n = 1, mean = mu_truth, sd = 1/sqrt(lambda))
   
-  # muの事後分布のパラメータを更新:式(3.53),(3.54)
+  # μの事後分布のパラメータを更新:式(3.53),(3.54)
   lambda_mu_old <- lambda_mu
   lambda_mu <- lambda + lambda_mu
   m         <- (lambda * x_n[n] + lambda_mu_old * m) / lambda_mu
   
-  # muの事後分布(ガウス分布)を計算:式(2.64)
+  # μの事後分布(ガウス分布)を計算:式(2.64)
   tmp_posterior_df <- tibble::tibble(
     mu = mu_vec, # 確率変数
     dens = dnorm(x = mu_vec, mean = m, sd = 1/sqrt(lambda_mu)), # 確率密度
@@ -313,12 +313,12 @@ anime_data_df <- tibble::tibble(
   param = unique(anime_posterior_df[["param"]]) # フレーム切替用ラベル
 )
 
-# muの事後分布のアニメーションを作図
+# μの事後分布のアニメーションを作図
 posterior_graph <- ggplot() + 
   geom_vline(mapping = aes(xintercept = mu_truth, color = "param"), 
              size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
   geom_line(data = anime_posterior_df, mapping = aes(x = mu, y = dens, color = "posterior"), 
-            size = 1) + # muの事後分布
+            size = 1) + # μの事後分布
   geom_point(data = anime_data_df, mapping = aes(x = x, y = 0, color = "data"), 
              size = 6) + # 観測データ
   gganimate::transition_manual(param) + # フレーム
