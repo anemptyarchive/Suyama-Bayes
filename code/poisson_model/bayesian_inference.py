@@ -1,315 +1,528 @@
-# 3.2.3 ポアソン分布の学習と予測
+
+# ポアソンモデル ----------------------------------------------------------------
+
+# chapter 3.2.3 
+# ベイズ推論
+# 推論アルゴリズムの実装
+
 
 #%%
 
-# 3.2.3項で利用するライブラリ
+# ライブラリの読込 ---------------------------------------------------------------
+
+# ライブラリを読込
 import numpy as np
-from scipy.special import gammaln # 対数ガンマ関数
-#from scipy.stats import poisson, gamma, nbinom # ポアソン分布, ガンマ分布, 負の二項分布
+from scipy.stats import poisson, gamma, nbinom
 import matplotlib.pyplot as plt
 
+
 #%%
 
-## 尤度(ポアソン分布)の設定
+# ベイズ推論の実装 ---------------------------------------------------------------
+
+### 生成分布(ポアソン分布)の設定 -----
+
+#### パラメータの設定 -----
 
 # 真のパラメータを指定
 lambda_truth = 4.0
 
-# 作図用のxの値を作成
-x_line = np.arange(4.0 * lambda_truth)
 
-# 尤度の確率を計算:式(2.37)
-model_prob = np.exp(
-    x_line * np.log(lambda_truth) - gammaln(x_line + 1) - lambda_truth
-)
-#model_prob = poisson.pmf(k=x_line, mu=lambda_truth)
+# %%
 
-#%%
+#### 変数の設定 -----
 
-# 尤度を作図
-plt.figure(figsize=(12, 9))
-plt.bar(x=x_line, height=model_prob, label='true model') # 真の分布
-plt.xlabel('x')
-plt.ylabel('prob')
-plt.suptitle('Poisson Distribution', fontsize=20)
-plt.title('$\lambda=' + str(lambda_truth) + '$', loc='left')
-plt.legend() # 凡例
-plt.grid() # グリッド線
-plt.show()
+# x軸の範囲を設定
+u = 5.0
+x_min = 0.0
+x_max = lambda_truth # 基準値を指定
+x_max *= 3.0 # 倍率を指定
+#x_max = max(x_max, x_n.max()) # サンプルと比較
+x_max = np.ceil(x_max /u)*u # u単位で切り上げ
+print('x size:', x_min, x_max)
 
-#%%
+# x軸の値を作成
+x_vec = np.arange(start=x_min, stop=x_max+1, step=1)
 
-## 観測データの生成
 
-# (観測)データ数を指定
-N = 50
+# %%
 
-# ポアソン分布に従うデータをランダムに生成
-x_n = np.random.poisson(lam=lambda_truth, size=N)
+#### 分布の計算 -----
+
+# 生成分布の確率を計算:式(2.37)
+model_prob_vec = poisson.pmf(k=x_vec, mu=lambda_truth)
+
 
 #%%
 
-# 度数をカウント
-x_uni, x_cnt = np.unique(x_n, return_counts=True)
+### 事前分布(ガンマ分布)の設定 -----
 
-# 観測データのヒストグラムを作成
-plt.figure(figsize=(12, 9))
-plt.bar(x=x_line, height=model_prob, 
-        color='white', edgecolor='red', linestyle='--', label='true model') # 真の分布
-plt.bar(x=x_uni, height=x_cnt/N, 
-        alpha=0.9, label='observation data') # 観測データ:(相対度数)
-#plt.bar(x=x_uni, height=x_cnt, label='observation data') # 観測データ:(度数)
-plt.xlabel('x')
-plt.ylabel('count')
-plt.suptitle('Poisson Distribution', fontsize=20)
-plt.title('$N=' + str(N) + ', \lambda=' + str(lambda_truth) + '$', loc='left')
-plt.legend() # 凡例
-plt.grid() # グリッド線
-plt.show()
-
-#%%
-
-## 事前分布(ガンマ分布)の設定
+#### パラメータの設定 -----
 
 # 事前分布のパラメータを指定
 a = 1.0
 b = 1.0
 
 
-# 作図用のlambdaの値を作成
-lambda_line = np.arange(0.0, 2.0 * lambda_truth, step=0.001)
+# %%
+
+#### 変数の設定 -----
+
+# λ軸の範囲を設定
+lambda_min = 0.0
+lambda_max = lambda_truth # 基準値を指定
+lambda_max *= 3.0 # 倍率を指定
+lambda_max = np.ceil(lambda_max /u)*u # u単位で切り上げ
+print(lambda_min, lambda_max)
+
+# λ軸の値を作成
+lambda_vec = np.linspace(start=lambda_min, stop=lambda_max, num=1001)
+
+
+# %%
+
+#### 分布の計算 -----
 
 # 事前分布の確率密度を計算:式(2.56)
-ln_C_Gam = a * np.log(b) - gammaln(a) # 正規化項(対数)
-prior_dens = np.exp(ln_C_Gam + (a - 1) * np.log(lambda_line) - b * lambda_line)
-#prior_dens = gamma.pdf(x=lambda_line, a=a, scale=1 / b)
+prior_dens_vec = gamma.pdf(x=lambda_vec, a=a, scale=1.0/b)
+
+
+# %%
+
+### 観測データの生成 -----
+
+#### データの生成 -----
+
+# データ数を指定
+N = 50
+
+# ポアソンモデルのデータを生成
+x_n = np.random.poisson(lam=lambda_truth, size=N)
+
 
 #%%
 
-# 事前分布を作図
-plt.figure(figsize=(12, 9))
-plt.plot(lambda_line, prior_dens, color='purple', label='prior') # 事前分布
-plt.vlines(x=lambda_truth, ymin=0, ymax=np.nanmax(prior_dens), 
-           color='red', linestyle='--', label='true val') # 真の値
-plt.xlabel('$\lambda$')
-plt.ylabel('density')
-plt.suptitle('Gamma Distribution', fontsize=20)
-plt.title('$a=' + str(a) + ', b=' + str(b) + "$", loc='left')
-plt.legend() # 凡例
-plt.grid() # グリッド線
-plt.show()
+### データの集計 -----
+
+# 度数を集計
+obs_freq_vec = np.array([np.sum(x_n == x) for x in x_vec])
+
+# 相対度数を計算
+obs_relfreq_vec = obs_freq_vec / N
+
 
 #%%
 
-## 事後分布(ガンマ分布)の計算
+### 事後分布(ガンマ分布)の計算 -----
+
+#### パラメータの計算 -----
 
 # 事後分布のパラメータを計算:式(3.38)
 a_hat = np.sum(x_n) + a
 b_hat = N + b
 
 
-# 事後分布の確率密度を計算:式(2.56)
-ln_C_Gam = a_hat * np.log(b_hat) - gammaln(a_hat) # 正規化項(対数)
-posterior_dens = np.exp(
-    ln_C_Gam + (a_hat - 1) * np.log(lambda_line) - b_hat * lambda_line
-)
-#posterior = gamma.pdf(x=lambda_line, a=a_hat, scale=1 / b_hat)
+# %%
 
-#%%
+#### 分布の計算 -----
+
+# 事後分布の確率密度を計算:式(2.56)
+posterior_dens_vec = gamma.pdf(x=lambda_vec, a=a_hat, scale=1.0/b_hat)
+
+
+# %%
+
+#### 分布の作図 -----
+
+# ラベル用の文字列を作成
+posterior_param_lbl  = f'$N = {N}, '
+posterior_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
+posterior_param_lbl += f'a = {a:.1f}, b = {b:.1f}, '
+posterior_param_lbl += f'\hat{{a}} == {a_hat:.1f}, \hat{{b}} == {b_hat:.1f}$'
 
 # 事後分布を作図
-plt.figure(figsize=(12, 9))
-plt.plot(lambda_line, posterior_dens, color='purple', label='posterior') # 事後分布
-plt.vlines(x=lambda_truth, ymin=0, ymax=np.nanmax(posterior_dens), 
-           color='red', linestyle='--', label='true val') # 真の値
-plt.xlabel('$\lambda$')
-plt.ylabel('density')
-plt.suptitle('Gamma Distribution', fontsize=20)
-plt.title('$N=' + str(N) + ', \hat{a}=' + str(a_hat) + ', \hat{b}=' + str(b_hat) + "$", loc='left')
-plt.legend() # 凡例
-plt.grid() # グリッド線
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white')
+fig.suptitle('Gamma distribution', fontsize=20)
+
+ax.axvline(
+    x=lambda_truth, 
+    color='red', linewidth=1.0, linestyle='--', 
+    label='true parameter', zorder=10
+) # 真のパラメータ
+ax.plot(
+    lambda_vec, prior_dens_vec, 
+    color='purple', linewidth=1.0, linestyle=':', 
+    label='prior distribution', zorder=11
+) # 事前分布
+ax.plot(
+    lambda_vec, posterior_dens_vec, 
+    color='purple', linewidth=1.0, 
+    label='posterior distribution', zorder=12
+) # 事後分布
+ax.set_xlabel('$\lambda$')
+ax.set_ylabel('density')
+ax.set_title(posterior_param_lbl, loc='left')
+ax.legend(prop={'size': 8})
+ax.grid(zorder=0)
+
 plt.show()
+
 
 #%%
 
-## 予測分布(負の二項分布)の計算
+### 予測分布(負の二項分布)の計算 -----
+
+#### パラメータの計算 -----
 
 # 予測分布のパラメータを計算:式(3.44')
 r_hat = a_hat
 p_hat = 1 / (b_hat + 1)
 
 
-# 予測分布の確率を計算:式(3.43)
-ln_C_NB = gammaln(x_line + r_hat) - gammaln(x_line + 1) - gammaln(r_hat) # 正規化項(対数)
-predict_prob = np.exp(ln_C_NB + r_hat * np.log(1 - p_hat) + x_line * np.log(p_hat)) # 確率
-#predict_prob = nbinom.pmf(k=x_line, n=r_hat, p=1 - p_hat) # 確率密度
+# %%
 
-#%%
+#### 分布の計算 -----
+
+# 予測分布の確率を計算:式(3.43)
+predict_prob_vec = nbinom.pmf(k=x_vec, n=r_hat, p=1.0-p_hat)
+
+
+# %%
+
+#### 分布の作図 -----
+
+# ラベル用の文字列を作成
+predict_param_lbl  = f'$N = {N}, '
+predict_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
+predict_param_lbl += f'\hat{{r}} == {r_hat:.1f}, \hat{{p}} == {p_hat:.3f}$'
 
 # 予測分布を作図
-plt.figure(figsize=(12, 9))
-plt.bar(x=x_line, height=model_prob, 
-        color='white', edgecolor='red', linestyle='--', label='true model') # 真の分布
-plt.bar(x=x_line, height=predict_prob, 
-        alpha=0.6, color='purple', label='predict') # 予測分布
-plt.xlabel('x')
-plt.ylabel('prod')
-plt.suptitle('Negative Binomial Distribution', fontsize=20)
-plt.title('$N=' + str(N) + 
-          ', \hat{r}=' + str(r_hat) + 
-          ', \hat{p}=' + str(np.round(p_hat, 3)) + '$', loc='left')
-plt.legend() # 凡例
-plt.grid() # グリッド線
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white')
+fig.suptitle('Negative Binomialson distribution', fontsize=20)
+
+ax.bar(
+    x=x_vec, height=model_prob_vec, 
+    facecolor='none', edgecolor='red', linewidth=1.0, linestyle='--', 
+    label='true model', zorder=10
+) # 真の分布
+ax.bar(
+    x=x_vec, height=predict_prob_vec, 
+    color='purple', alpha=0.5, 
+    label='predict', zorder=11
+) # 予測分布
+ax.set_xticks(ticks=x_vec)
+ax.set_xlabel('$x$')
+ax.set_ylabel('probability')
+ax.set_title(predict_param_lbl, loc='left')
+ax.legend(prop={'size': 8})
+ax.grid(zorder=0)
+
 plt.show()
 
 
+
+# %%
+
+# ポアソンモデル ----------------------------------------------------------------
+
+# chapter 3.2.3 
+# ベイズ推論
+# 学習推移の可視化
+
+
 #%%
 
-### アニメーションによる推移の確認
+# ライブラリの読込 ---------------------------------------------------------------
 
-# 3.2.3項で利用するライブラリ
+# ライブラリを読込
 import numpy as np
-from scipy.stats import poisson, gamma, nbinom # ポアソン分布, ガンマ分布, 負の二項分布
+from scipy.stats import poisson, gamma, nbinom
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation
+
 
 #%%
 
-## モデルの設定
+# ベイズ推論の可視化 -------------------------------------------------------------
+
+### 生成分布の設定 -----
 
 # 真のパラメータを指定
 lambda_truth = 4.0
+
+
+# %%
+
+### 観測データの生成 -----
+
+# データ数を指定
+N = 100
+
+# ポアソンモデルのデータを生成
+x_n = np.random.poisson(lam=lambda_truth, size=N)
+
+
+# %%
+
+### 変数の設定 -----
+
+# x軸の範囲を設定
+u = 5.0
+x_min = 0.0
+x_max = lambda_truth # 基準値を指定
+x_max *= 3.0 # 倍率を指定
+x_max = max(x_max, x_n.max()) # サンプルと比較
+x_max = np.ceil(x_max /u)*u # u単位で切り上げ
+print('x size:', x_min, x_max)
+
+# x軸の値を作成
+x_vec = np.arange(start=x_min, stop=x_max+1, step=1)
+
+
+# λ軸の範囲を設定
+lambda_min = x_min
+lambda_max = x_max
+print('λ size:', lambda_min, lambda_max)
+
+# λ軸の値を作成
+lambda_vec = np.linspace(start=lambda_min, stop=lambda_max, num=1001)
+
+
+# %%
+
+### パラメータの更新 -----
+
+#### 逐次更新の場合 -----
 
 # 事前分布のパラメータを指定
 a = 1.0
 b = 1.0
 
-# 初期値による予測分布のパラメータを計算:式(3.44)
+
+# 予測分布のパラメータを計算:式(3.44)
 r = a
 p = 1.0 / (b + 1.0)
 
+# 初期値を記録
+trace_a_lt = [a]
+trace_b_lt = [b]
+trace_r_lt = [r]
+trace_p_lt = [p]
 
-# 作図用のlambdaの値を作成
-lambda_line = np.linspace(0.0, 2.0 * lambda_truth, num=1000)
-
-# 作図用のxの値を作成
-x_line = np.arange(4.0 * lambda_truth)
-
-#%%
-
-## 推論処理
-
-# データ数(試行回数)を指定
-N = 100
-
-# 観測データの受け皿を作成
-x_n = np.empty(N)
-
-# 推移の記録用の受け皿を初期化
-trace_a = [a]
-trace_b = [b]
-trace_posterior = [gamma.pdf(x=lambda_line, a=a, scale=1.0 / b)]
-trace_r = [r]
-trace_p = [p]
-trace_predict = [nbinom.pmf(k=x_line, n=r, p=1.0 - p)]
-
-# ベイズ推論
+# パラメータを更新
 for n in range(N):
-    # ポアソン分布に従うデータを生成
-    x_n[n] = np.random.poisson(lam=lambda_truth, size=1)
+
+    # 観測データを取得
+    x = x_n[n]
     
     # 事後分布のパラメータを更新:式(3.38)
-    a += x_n[n]
+    a += x
     b += 1.0
-    
-    # 事後分布(ガンマ分布)を計算:式(2.56)
-    trace_posterior.append(gamma.pdf(x=lambda_line, a=a, scale=1 / b)) # 確率密度
     
     # 予測分布のパラメータを更新:式(3.44)
     r = a
     p = 1.0 / (b + 1.0)
+    #a += x
+    #p = 1.0 / (1.0/p + 1.0)
     
-    # 予測分布(負の二項分布)を計算:式(3.43)
-    trace_predict.append(nbinom.pmf(k=x_line, n=r, p=1.0 - p)) # 確率
-    
-    # 超パラメータを記録
-    trace_a.append(a)
-    trace_b.append(b)
-    trace_r.append(r)
-    trace_p.append(p)
+    # 更新値を記録
+    trace_a_lt.append(a)
+    trace_b_lt.append(b)
+    trace_r_lt.append(r)
+    trace_p_lt.append(p)
 
-# 観測データを確認
-print(x_n[:5])
+    # 動作確認
+    print(f'{n+1} / {N}')
 
-#%%
 
-## 事後分布の推移をgif画像化
+# %%
 
-# 画像サイズを指定
-fig = plt.figure(figsize=(12, 9))
+#### 一括更新の場合 -----
 
-# 作図処理を関数として定義
-def update_posterior(n):
+# 事前分布のパラメータを指定
+a = 1.0
+b = 1.0
+
+
+# 事後分布のパラメータを計算:式(3.38)
+trace_a_lt = np.hstack(
+    [a, np.cumsum(x_n) + a]
+).tolist()
+trace_b_lt = (
+    np.arange(N+1) + b
+).tolist()
+
+# 予測分布のパラメータを計算:式(3.44')
+trace_r_lt = np.hstack(
+    [a, np.cumsum(x_n) + a]
+).tolist()
+trace_p_lt = (
+    1.0 / (np.arange(N+1) + b + 1.0)
+).tolist()
+
+
+# %%
+
+### 推移の作図 -----
+
+#### 事後分布の作図 -----
+
+# 事後分布の確率密度を計算:式(2.56)
+trace_posterior_lt = [
+    gamma.pdf(x=lambda_vec, a=trace_a_lt[i], scale=1.0/trace_b_lt[i]) for i in range(N+1)
+]
+
+
+# 確率密度軸の範囲を設定
+u = 0.05
+dens_max = np.max(trace_posterior_lt)
+dens_max = np.ceil(dens_max /u)*u # u単位で切り上げ
+
+# 図を初期化
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white')
+fig.suptitle('Gamma distribution', fontsize=20)
+
+# 初期化処理を定義
+def init():
+    pass
+
+# 作図処理を定義
+def update(i):
+
     # 前フレームのグラフを初期化
-    plt.cla()
+    ax.cla()
     
-    # n回目の事後分布を作図
-    plt.plot(lambda_line, trace_posterior[n], 
-             color='purple', label='posterior') # 事後分布
-    plt.vlines(x=lambda_truth, ymin=0.0, ymax=np.nanmax(trace_posterior), 
-               color='red', linestyles='--', label='true val') # 真のパラメータ
-    if n > 0: # 初回は除く
-        plt.scatter(x_n[n-1], y=0.0, s=100, label='data') # 観測データ
-    plt.xlabel('$\lambda$')
-    plt.ylabel('density')
-    plt.suptitle('Gamma Distribution', fontsize=20)
-    plt.title('$N=' + str(n) + 
-              ', \hat{a}=' + str(trace_a[n]) + 
-              ', \hat{b}=' + str(trace_b[n]) + "$", loc='left')
-    plt.legend() # 凡例
-    plt.grid() # グリッド線
+    # 値を取得
+    n = i # データ番号
+    x = x_n[i-1] if n > 0 else np.nan # 観測値
+    a = trace_a_lt[i] # 形状パラメータ
+    b = trace_b_lt[i] # 尺度パラメータ
+    posterior_dens_vec = trace_posterior_lt[i] # 確率密度
+    
+    # ラベル用の文字列を作成
+    posterior_param_lbl  = f'$N = {n}, '
+    posterior_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
+    posterior_param_lbl += f'\hat{{a}} == {a:.1f}, \hat{{b}} == {b:.1f}$'
 
-# gif画像を作成
-posterior_anime = animation.FuncAnimation(fig, update_posterior, frames=N + 1, interval=100)
-posterior_anime.save("ch3_2_3_Posterior.gif")
+    # 事後分布を描画
+    ax.axvline(
+        x=lambda_truth, 
+        color='red', linewidth=1.0, linestyle='--', 
+        label='true parameter', zorder=10
+    ) # 真のパラメータ
+    ax.plot(
+        lambda_vec, posterior_dens_vec, 
+        color='purple', linewidth=1.0, 
+        label='posterior distribution', zorder=11
+    ) # 事後分布
+    plt.scatter(
+        x=x, y=0.0, 
+        c='pink', s=100, 
+        label='observation data', clip_on=False, zorder=12
+    ) # 観測データ
+    ax.set_xlabel('$\lambda$')
+    ax.set_ylabel('density')
+    ax.set_title(posterior_param_lbl, loc='left')
+    ax.legend(loc='upper left', prop={'size': 8})
+    ax.grid(zorder=0)
+    ax.set_xlim(xmin=lambda_min, xmax=lambda_max) # 描画範囲を固定
+    ax.set_ylim(ymin=0.0, ymax=dens_max) # 描画範囲を固定
 
-#%%
+# 動画を作成
+anim = FuncAnimation(
+    fig=fig, func=update, init_func=init, 
+    frames=N+1, interval=100
+)
 
-## 予測分布の推移をgif画像化
+# 動画を書出
+anim.save(
+    filename='../../figure/poisson/parameter_updates/posterior.mp4', 
+    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+)
 
-# 尤度を計算:式(2.37)
-true_model = poisson.pmf(k=x_line, mu=lambda_truth)
 
-# 画像サイズを指定
-fig = plt.figure(figsize=(12, 9))
+# %%
 
-# 作図処理を関数として定義
-def update_predict(n):
+#### 予測分布の作図 -----
+
+# 生成分布の確率を計算:式(2.37)
+model_prob_vec = poisson.pmf(k=x_vec, mu=lambda_truth)
+
+# 予測分布の確率を計算:式(3.43)
+trace_predict_lt = [
+    nbinom.pmf(k=x_vec, n=trace_r_lt[i], p=1.0-trace_p_lt[i]) for i in range(N+1)
+]
+
+
+# 確率軸の範囲を設定
+u = 0.05
+prob_max = np.max(trace_predict_lt)
+prob_max = np.ceil(prob_max /u)*u # u単位で切り上げ
+
+# 図を初期化
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white')
+fig.suptitle('Negative Binomial distribution', fontsize=20)
+
+# 初期化処理を定義
+def init():
+    pass
+
+# 作図処理を定義
+def update(i):
+
     # 前フレームのグラフを初期化
-    plt.cla()
+    ax.cla()
     
-    # n回目の予測分布を作図
-    plt.bar(x=x_line, height=true_model, 
-            color='white', edgecolor='red', linestyle='--', label='true model', zorder=0) # 真の分布
-    plt.bar(x=x_line, height=trace_predict[n], 
-            alpha=0.6, color='purple', label='predict', zorder=1) # 予測分布
-    if n > 0: # 初回は除く
-        plt.scatter(x=x_n[n-1], y=0.0, s=100, label='data', zorder=2) # 観測データ
-    plt.xlabel('x')
-    plt.ylabel('prob')
-    plt.suptitle('Bernoulli Distribution', fontsize=20)
-    plt.suptitle('Negative Binomial Distribution', fontsize=20)
-    plt.title('$N=' + str(n) + 
-              ', \hat{r}=' + str(trace_r[n]) + 
-              ', \hat{p}=' + str(np.round(trace_p[n], 5)) + '$', loc='left')
-    plt.ylim(-0.01, np.nanmax(trace_predict)) # y軸の表示範囲
-    plt.legend() # 凡例
+    # 値を取得
+    n = i # データ番号
+    x = x_n[i-1] if n > 0 else np.nan # 観測値
+    r = trace_r_lt[i] # 成功回数パラメータ
+    p = trace_p_lt[i] # 失敗確率パラメータ
+    predict_prob_vec = trace_predict_lt[i] # 確率
+    
+    # ラベル用の文字列を作成
+    predict_param_lbl  = f'$N = {n}, '
+    predict_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
+    predict_param_lbl += f'\hat{{r}} == {r:.1f}, \hat{{p}} == {p:.3f}$'
 
-# gif画像を作成
-predict_anime = animation.FuncAnimation(fig, update_predict, frames=N + 1, interval=100)
-predict_anime.save("ch3_2_3_Predict.gif")
+    # 予測分布を描画
+    ax.bar(
+        x=x_vec, height=model_prob_vec, 
+        facecolor='none', edgecolor='red', linewidth=1.0, linestyle='--', 
+        label='true model', zorder=10
+    ) # 真の分布
+    ax.bar(
+        x=x_vec, height=predict_prob_vec, 
+        color='purple', alpha=0.5, 
+        label='predict distribution', zorder=11
+    ) # 予測分布
+    plt.scatter(
+        x=x, y=0.0, 
+        c='pink', s=100, 
+        label='observation data', clip_on=False, zorder=12
+    ) # 観測データ
+    ax.set_xticks(ticks=x_vec)
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('probability')
+    ax.set_title(predict_param_lbl, loc='left')
+    ax.legend(prop={'size': 8})
+    ax.grid(zorder=0)
+    ax.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # 描画範囲を固定
+    ax.set_ylim(ymin=0.0, ymax=prob_max) # 描画範囲を固定
+
+# 動画を作成
+anim = FuncAnimation(
+    fig=fig, func=update, init_func=init, 
+    frames=N+1, interval=100
+)
+
+# 動画を書出
+anim.save(
+    filename='../../figure/poisson/parameter_updates/predict.mp4', 
+    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+)
+
 
 #%%
 
-print('end')
 
