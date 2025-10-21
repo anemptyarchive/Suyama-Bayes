@@ -73,7 +73,7 @@ lambda_min = 0.0
 lambda_max = lambda_truth # 基準値を指定
 lambda_max *= 3.0 # 倍率を指定
 lambda_max = np.ceil(lambda_max /u)*u # u単位で切り上げ
-print(lambda_min, lambda_max)
+print('λ size:', lambda_min, lambda_max)
 
 # λ軸の値を作成
 lambda_vec = np.linspace(start=lambda_min, stop=lambda_max, num=1001)
@@ -141,7 +141,7 @@ posterior_param_lbl += f'a = {a:.1f}, b = {b:.1f}, '
 posterior_param_lbl += f'\hat{{a}} == {a_hat:.1f}, \hat{{b}} == {b_hat:.1f}$'
 
 # 事後分布を作図
-fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white')
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
 fig.suptitle('Gamma distribution', fontsize=20)
 
 ax.axvline(
@@ -161,9 +161,14 @@ ax.plot(
 ) # 事後分布
 ax.set_xlabel('$\lambda$')
 ax.set_ylabel('density')
-ax.set_title(posterior_param_lbl, loc='left')
+ax.set_title(posterior_param_lbl, loc='left') # パラメータラベル
 ax.legend(prop={'size': 8})
 ax.grid(zorder=0)
+ax.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
+
+ax2 = ax.twiny() # 第2軸の設定用
+ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{turth}$']) # パラメータラベル
+ax2.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
 
 plt.show()
 
@@ -194,10 +199,10 @@ predict_prob_vec = nbinom.pmf(k=x_vec, n=r_hat, p=1.0-p_hat)
 # ラベル用の文字列を作成
 predict_param_lbl  = f'$N = {N}, '
 predict_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
-predict_param_lbl += f'\hat{{r}} == {r_hat:.1f}, \hat{{p}} == {p_hat:.3f}$'
+predict_param_lbl += f'\hat{{r}} == {r_hat:.1f}, \hat{{p}} == {p_hat:.5f}$'
 
 # 予測分布を作図
-fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white')
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
 fig.suptitle('Negative Binomialson distribution', fontsize=20)
 
 ax.bar(
@@ -213,9 +218,14 @@ ax.bar(
 ax.set_xticks(ticks=x_vec)
 ax.set_xlabel('$x$')
 ax.set_ylabel('probability')
-ax.set_title(predict_param_lbl, loc='left')
+ax.set_title(predict_param_lbl, loc='left') # パラメータラベル
 ax.legend(prop={'size': 8})
 ax.grid(zorder=0)
+ax.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
+
+ax2 = ax.twiny() # 第2軸の設定用
+ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{turth}$']) # パラメータラベル
+ax2.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
 
 plt.show()
 

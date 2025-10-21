@@ -155,8 +155,9 @@ dens_max = np.max(trace_posterior_lt)
 dens_max = np.ceil(dens_max /u)*u # u単位で切り上げ
 
 # 図を初期化
-fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white')
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
 fig.suptitle('Gamma distribution', fontsize=20)
+ax2 = ax.twiny() # 第2軸の設定用
 
 # 初期化処理を定義
 def init():
@@ -167,6 +168,7 @@ def update(i):
 
     # 前フレームのグラフを初期化
     ax.cla()
+    ax2.cla()
     
     # 値を取得
     n = i # データ番号
@@ -198,11 +200,15 @@ def update(i):
     ) # 観測データ
     ax.set_xlabel('$\lambda$')
     ax.set_ylabel('density')
-    ax.set_title(posterior_param_lbl, loc='left')
+    ax.set_title(posterior_param_lbl, loc='left') # パラメータラベル
     ax.legend(loc='upper left', prop={'size': 8})
     ax.grid(zorder=0)
     ax.set_xlim(xmin=lambda_min, xmax=lambda_max) # 描画範囲を固定
     ax.set_ylim(ymin=0.0, ymax=dens_max) # 描画範囲を固定
+    
+    # 第2軸を描画
+    ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{turth}$']) # パラメータラベル
+    ax2.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
 
 # 動画を作成
 anim = FuncAnimation(
@@ -236,8 +242,9 @@ prob_max = np.max(trace_predict_lt)
 prob_max = np.ceil(prob_max /u)*u # u単位で切り上げ
 
 # 図を初期化
-fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white')
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
 fig.suptitle('Negative Binomial distribution', fontsize=20)
+ax2 = ax.twiny() # 第2軸の設定用
 
 # 初期化処理を定義
 def init():
@@ -248,6 +255,7 @@ def update(i):
 
     # 前フレームのグラフを初期化
     ax.cla()
+    ax2.cla()
     
     # 値を取得
     n = i # データ番号
@@ -259,7 +267,7 @@ def update(i):
     # ラベル用の文字列を作成
     predict_param_lbl  = f'$N = {n}, '
     predict_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
-    predict_param_lbl += f'\hat{{r}} == {r:.1f}, \hat{{p}} == {p:.3f}$'
+    predict_param_lbl += f'\hat{{r}} == {r:.1f}, \hat{{p}} == {p:.5f}$'
 
     # 予測分布を描画
     ax.bar(
@@ -280,11 +288,15 @@ def update(i):
     ax.set_xticks(ticks=x_vec)
     ax.set_xlabel('$x$')
     ax.set_ylabel('probability')
-    ax.set_title(predict_param_lbl, loc='left')
+    ax.set_title(predict_param_lbl, loc='left') # パラメータラベル
     ax.legend(prop={'size': 8})
     ax.grid(zorder=0)
     ax.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # 描画範囲を固定
     ax.set_ylim(ymin=0.0, ymax=prob_max) # 描画範囲を固定
+
+    # 第2軸を描画
+    ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{turth}$']) # パラメータラベル
+    ax2.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
 
 # 動画を作成
 anim = FuncAnimation(
