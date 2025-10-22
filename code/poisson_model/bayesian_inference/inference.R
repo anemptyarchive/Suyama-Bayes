@@ -43,7 +43,7 @@ x_vec <- seq(from = x_min, to = x_max, by = 1)
 
 #### 分布の計算 -----
 
-# 生成分布の確率を計算:式(2.37)
+# 生成分布の確率を計算
 model_df <- tibble::tibble(
   x      = x_vec, # 確率変数
   lambda = lambda_truth, # 期待値パラメータ
@@ -75,7 +75,7 @@ lambda_vec <- seq(from = lambda_min, to = lambda_max, length.out = 1001)
 
 #### 分布の計算 -----
 
-# 事前分布の確率密度を計算:式(2.56)
+# 事前分布の確率密度を計算
 prior_df <- tibble::tibble(
   lambda = lambda_vec, # 確率変数
   a      = a, # 形状パラメータ
@@ -124,7 +124,7 @@ b_hat <- N + b
 
 #### 分布の計算 -----
 
-# 事後分布の確率密度を計算:式(2.56)
+# 事後分布の確率密度を計算
 posterior_df <- tibble::tibble(
   lambda = lambda_vec, # 確率変数
   a      = a_hat, # 形状パラメータ
@@ -167,8 +167,8 @@ ggplot() +
   scale_x_continuous(
     sec.axis = sec_axis(
       transform = ~ ., 
-      breaks = lambda_truth, 
-      labels = expression(lambda[truth])
+      breaks    = lambda_truth, 
+      labels    = expression(lambda[truth])
     ) # パラメータラベル
   ) + 
   scale_color_manual(
@@ -194,19 +194,22 @@ ggplot() +
 
 # 予測分布のパラメータを計算:式(3.44')
 r_hat <- a_hat
-p_hat <- 1 / (b_hat + 1)
+q_hat <- 1 / (1 + b_hat)
+p_hat <- b_hat / (1 + b_hat)
 #r_hat <- sum(x_n) + a
-#p_hat <- 1 / (N + b + 1)
+#q_hat <- 1 / (1 + N + b)
+#p_hat <- (N + b) / (1 + N + b)
+#p_hat <- 1 - q_hat
 
 
 #### 分布の計算 -----
 
-# 予測分布の確率を計算:式(3.43)
+# 予測分布の確率を計算
 predict_df <- tibble::tibble(
   x    = x_vec, # 確率変数
   r    = r_hat, # 成功回数パラメータ
-  p    = p_hat, # 失敗確率パラメータ
-  prob = dnbinom(x = x, size = r_hat, prob = 1-p_hat) # 確率
+  p    = p_hat, # 成功確率パラメータ
+  prob = dnbinom(x = x, size = r, prob = p) # 確率
 )
 
 
@@ -241,8 +244,8 @@ ggplot() +
     breaks = x_vec, minor_breaks = FALSE, 
     sec.axis = sec_axis(
       transform = ~ ., 
-      breaks = lambda_truth, 
-      labels = expression(lambda[truth])
+      breaks    = lambda_truth, 
+      labels    = expression(lambda[truth])
     ) # パラメータラベル
   ) + 
   scale_color_manual(

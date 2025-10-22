@@ -127,7 +127,7 @@ trace_a_i <- c(a, cumsum(x_n) + a)
 trace_b_i <- 0:N + b
 
 # 予測分布のパラメータを計算:式(3.44')
-trace_r_i <- c(a, cumsum(x_n) + a)
+trace_r_i <- trace_a_i
 trace_q_i <- 1 / (1 + 0:N + b)
 trace_p_i <- (0:N + b) / (1 + 0:N + b)
 
@@ -143,7 +143,7 @@ anim_obs_df <- tibble::tibble(
 
 #### 事後分布の作図 -----
 
-# 事後分布の確率を計算:式(3.38)
+# 事後分布の確率密度を計算
 anim_posterior_df <- tidyr::expand_grid(
   n      = 0:N,       # 試行回数
   lambda = lambda_vec # 確率変数
@@ -196,8 +196,8 @@ posterior_graph <- ggplot() +
   scale_x_continuous(
     sec.axis = sec_axis(
       transform = ~ ., 
-      breaks = lambda_truth, 
-      labels = expression(lambda[truth])
+      breaks    = lambda_truth, 
+      labels    = expression(lambda[truth])
     ) # パラメータラベル
   ) + 
   scale_color_manual(
@@ -306,8 +306,8 @@ predict_graph <- ggplot() +
     breaks = x_vec, minor_breaks = FALSE, 
     sec.axis = sec_axis(
       transform = ~ ., 
-      breaks = lambda_truth, 
-      labels = expression(lambda[truth])
+      breaks    = lambda_truth, 
+      labels    = expression(lambda[truth])
     ) # パラメータラベル
   ) + 
   scale_color_manual(
@@ -466,8 +466,8 @@ for(i in 1:(N+1)) {
       breaks = x_vec, minor_breaks = FALSE, 
       sec.axis = sec_axis(
         transform = ~ ., 
-        breaks = c(E_x, bar_x), 
-        labels = c(expression(E(x)), expression(bar(x)))
+        breaks    = c(E_x, bar_x), 
+        labels    = c(expression(E(x)), expression(bar(x)))
       ) # パラメータラベル
     ) + 
     scale_y_continuous(
@@ -546,8 +546,8 @@ for(i in 1:(N+1)) {
     scale_x_continuous(
       sec.axis = sec_axis(
         transform = ~ ., 
-        breaks = c(lambda_truth, E_lambda), 
-        labels = c(expression(lambda[truth]), expression(E(lambda)))
+        breaks    = c(lambda_truth, E_lambda), 
+        labels    = c(expression(lambda[truth]), expression(E(lambda)))
       ) # パラメータラベル
     ) + 
     scale_color_manual(
@@ -624,8 +624,8 @@ for(i in 1:(N+1)) {
       breaks = x_vec, minor_breaks = FALSE, 
       sec.axis = sec_axis(
         transform = ~ ., 
-        breaks = c(lambda_truth, E_x), 
-        labels = c(expression(lambda[truth]), expression(E(x)))
+        breaks    = c(lambda_truth, E_x), 
+        labels    = c(expression(lambda[truth]), expression(E(x)))
       ) # パラメータラベル
     ) + 
     scale_color_manual(

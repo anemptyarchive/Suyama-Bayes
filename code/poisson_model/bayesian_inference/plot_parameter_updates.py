@@ -21,7 +21,7 @@ from matplotlib.animation import FuncAnimation
 
 # ベイズ推論の可視化 -------------------------------------------------------------
 
-### 生成分布の設定 -----
+### 生成分布(ポアソン分布)の設定 -----
 
 # 真のパラメータを指定
 lambda_truth = 4.0
@@ -31,7 +31,10 @@ lambda_truth = 4.0
 
 ### 観測データの生成 -----
 
-# データ数を指定
+# (ノートとの対応用)
+np.random.seed(86)
+
+# データ数(試行回数)を指定
 N = 100
 
 # ポアソンモデルのデータを生成
@@ -70,14 +73,15 @@ lambda_vec = np.linspace(start=lambda_min, stop=lambda_max, num=1001)
 
 #### 逐次更新の場合 -----
 
-# 事前分布のパラメータを指定
+# 事前分布のパラメータを初期化
 a = 1.0
 b = 1.0
 
 
 # 予測分布のパラメータを計算:式(3.44)
 r = a
-p = 1.0 / (b + 1.0)
+q = 1.0 / (1.0 + b)
+p = 1.0 - q
 
 # 初期値を記録
 trace_a_lt = [a]
@@ -97,9 +101,11 @@ for n in range(N):
     
     # 予測分布のパラメータを更新:式(3.44)
     r = a
-    p = 1.0 / (b + 1.0)
-    #a += x
-    #p = 1.0 / (1.0/p + 1.0)
+    q = 1.0 / (1.0 + b)
+    p = b / (1.0 + b)
+    #r += x
+    #q = 1.0 / (1.0 + 1.0/q)
+    p = 1.0 - q
     
     # 更新値を記録
     trace_a_lt.append(a)
@@ -115,7 +121,7 @@ for n in range(N):
 
 #### 一括更新の場合 -----
 
-# 事前分布のパラメータを指定
+# 事前分布のパラメータを初期化
 a = 1.0
 b = 1.0
 
@@ -129,11 +135,12 @@ trace_b_lt = (
 ).tolist()
 
 # 予測分布のパラメータを計算:式(3.44')
-trace_r_lt = np.hstack(
-    [a, np.cumsum(x_n) + a]
+trace_r_lt = trace_a_lt.copy()
+trace_q_lt = (
+    1.0 / (1.0 + np.arange(N+1) + b)
 ).tolist()
 trace_p_lt = (
-    1.0 / (np.arange(N+1) + b + 1.0)
+    (np.arange(N+1) + b) / (1.0 + np.arange(N+1) + b)
 ).tolist()
 
 
@@ -143,15 +150,15 @@ trace_p_lt = (
 
 #### 事後分布の作図 -----
 
-# 事後分布の確率密度を計算:式(2.56)
-trace_posterior_lt = [
+# 事後分布の確率密度を計算
+anim_posterior_lt = [
     gamma.pdf(x=lambda_vec, a=trace_a_lt[i], scale=1.0/trace_b_lt[i]) for i in range(N+1)
 ]
 
 
 # 確率密度軸の範囲を設定
 u = 0.05
-dens_max = np.max(trace_posterior_lt)
+dens_max = np.max(anim_posterior_lt)
 dens_max = np.ceil(dens_max /u)*u # u単位で切り上げ
 
 # 図を初期化
@@ -175,7 +182,7 @@ def update(i):
     x = x_n[i-1] if n > 0 else np.nan # 観測値
     a = trace_a_lt[i] # 形状パラメータ
     b = trace_b_lt[i] # 尺度パラメータ
-    posterior_dens_vec = trace_posterior_lt[i] # 確率密度
+    posterior_dens_vec = anim_posterior_lt[i] # 確率密度
     
     # ラベル用の文字列を作成
     posterior_param_lbl  = f'$N = {n}, '
@@ -195,7 +202,7 @@ def update(i):
     ) # 事後分布
     plt.scatter(
         x=x, y=0.0, 
-        c='pink', s=100, 
+        c='hotpink', s=100, 
         label='observation data', clip_on=False, zorder=12
     ) # 観測データ
     ax.set_xlabel('$\lambda$')
@@ -207,7 +214,7 @@ def update(i):
     ax.set_ylim(ymin=0.0, ymax=dens_max) # 描画範囲を固定
     
     # 第2軸を描画
-    ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{turth}$']) # パラメータラベル
+    ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{truth}$']) # パラメータラベル
     ax2.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
 
 # 動画を作成
@@ -227,18 +234,18 @@ anim.save(
 
 #### 予測分布の作図 -----
 
-# 生成分布の確率を計算:式(2.37)
+# 生成分布の確率を計算
 model_prob_vec = poisson.pmf(k=x_vec, mu=lambda_truth)
 
-# 予測分布の確率を計算:式(3.43)
-trace_predict_lt = [
-    nbinom.pmf(k=x_vec, n=trace_r_lt[i], p=1.0-trace_p_lt[i]) for i in range(N+1)
+# 予測分布の確率を計算
+anim_predict_lt = [
+    nbinom.pmf(k=x_vec, n=trace_r_lt[i], p=trace_p_lt[i]) for i in range(N+1)
 ]
 
 
 # 確率軸の範囲を設定
 u = 0.05
-prob_max = np.max(trace_predict_lt)
+prob_max = np.max(anim_predict_lt)
 prob_max = np.ceil(prob_max /u)*u # u単位で切り上げ
 
 # 図を初期化
@@ -261,8 +268,8 @@ def update(i):
     n = i # データ番号
     x = x_n[i-1] if n > 0 else np.nan # 観測値
     r = trace_r_lt[i] # 成功回数パラメータ
-    p = trace_p_lt[i] # 失敗確率パラメータ
-    predict_prob_vec = trace_predict_lt[i] # 確率
+    p = trace_p_lt[i] # 成功確率パラメータ
+    predict_prob_vec = anim_predict_lt[i] # 確率
     
     # ラベル用の文字列を作成
     predict_param_lbl  = f'$N = {n}, '
@@ -282,7 +289,7 @@ def update(i):
     ) # 予測分布
     plt.scatter(
         x=x, y=0.0, 
-        c='pink', s=100, 
+        c='hotpink', s=100, 
         label='observation data', clip_on=False, zorder=12
     ) # 観測データ
     ax.set_xticks(ticks=x_vec)
@@ -295,7 +302,7 @@ def update(i):
     ax.set_ylim(ymin=0.0, ymax=prob_max) # 描画範囲を固定
 
     # 第2軸を描画
-    ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{turth}$']) # パラメータラベル
+    ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{truth}$']) # パラメータラベル
     ax2.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
 
 # 動画を作成

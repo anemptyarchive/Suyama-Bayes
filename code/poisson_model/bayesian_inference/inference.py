@@ -49,7 +49,7 @@ x_vec = np.arange(start=x_min, stop=x_max+1, step=1)
 
 #### 分布の計算 -----
 
-# 生成分布の確率を計算:式(2.37)
+# 生成分布の確率を計算
 model_prob_vec = poisson.pmf(k=x_vec, mu=lambda_truth)
 
 
@@ -83,7 +83,7 @@ lambda_vec = np.linspace(start=lambda_min, stop=lambda_max, num=1001)
 
 #### 分布の計算 -----
 
-# 事前分布の確率密度を計算:式(2.56)
+# 事前分布の確率密度を計算
 prior_dens_vec = gamma.pdf(x=lambda_vec, a=a, scale=1.0/b)
 
 
@@ -126,7 +126,7 @@ b_hat = N + b
 
 #### 分布の計算 -----
 
-# 事後分布の確率密度を計算:式(2.56)
+# 事後分布の確率密度を計算
 posterior_dens_vec = gamma.pdf(x=lambda_vec, a=a_hat, scale=1.0/b_hat)
 
 
@@ -167,7 +167,7 @@ ax.grid(zorder=0)
 ax.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
 
 ax2 = ax.twiny() # 第2軸の設定用
-ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{turth}$']) # パラメータラベル
+ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{truth}$']) # パラメータラベル
 ax2.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
 
 plt.show()
@@ -181,15 +181,20 @@ plt.show()
 
 # 予測分布のパラメータを計算:式(3.44')
 r_hat = a_hat
-p_hat = 1 / (b_hat + 1)
+q_hat = 1.0 / (1.0 + b_hat)
+p_hat = b_hat / (1.0 + b_hat)
+#r_hat = np.sum(x_n) + a
+#q_hat = 1.0 / (1.0 + N + b)
+#p_hat = (N + b) / (1.0 + N + b)
+#p_hat = 1 - q_hat
 
 
 # %%
 
 #### 分布の計算 -----
 
-# 予測分布の確率を計算:式(3.43)
-predict_prob_vec = nbinom.pmf(k=x_vec, n=r_hat, p=1.0-p_hat)
+# 予測分布の確率を計算
+predict_prob_vec = nbinom.pmf(k=x_vec, n=r_hat, p=p_hat)
 
 
 # %%
@@ -224,7 +229,7 @@ ax.grid(zorder=0)
 ax.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
 
 ax2 = ax.twiny() # 第2軸の設定用
-ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{turth}$']) # パラメータラベル
+ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{truth}$']) # パラメータラベル
 ax2.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
 
 plt.show()
