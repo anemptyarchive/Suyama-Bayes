@@ -6,11 +6,10 @@
 # 推論アルゴリズムの実装
 
 
-# ライブラリの読込 -------------------------------------------------------------
+# パッケージの読込 -------------------------------------------------------------
 
 # 利用パッケージ
 library(tidyverse)
-library(gganimate)
 
 # パッケージ名の省略用
 library(ggplot2)
@@ -35,7 +34,6 @@ x_max <- lambda_truth |> # 基準値を指定
   (\(.) {. * 3})() |> # 倍率を指定
   #(\(.) {max(., x_n)})() |> # # サンプルと比較
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
-x_min; x_max
 
 # x軸の値を作成
 x_vec <- seq(from = x_min, to = x_max, by = 1)
@@ -91,7 +89,7 @@ prior_df <- tibble::tibble(
 # データ数を指定
 N <- 50
 
-# ポアソンモデルのデータを生成
+# 観測データを生成
 x_n <- rpois(n = N ,lambda = lambda_truth)
 
 
@@ -135,7 +133,7 @@ posterior_df <- tibble::tibble(
 
 #### 分布の作図 -----
 
-# ラベル用の文字列を作成
+# 事後分布のラベルを作成
 posterior_param_lbl <- paste0(
   "list(", 
   "N == ", N, ", ", 
@@ -215,7 +213,7 @@ predict_df <- tibble::tibble(
 
 #### 分布の作図 -----
 
-# ラベル用の文字列を作成
+# 予測分布のラベルを作成
 predict_param_lbl <- paste0(
   "list(", 
   "N == ", N, ", ", 
@@ -240,14 +238,7 @@ ggplot() +
     stat = "identity", position = "identity", 
     fill = "purple", alpha = 0.5, linetype = "blank"
   ) + # 予測分布
-  scale_x_continuous(
-    breaks = x_vec, minor_breaks = FALSE, 
-    sec.axis = sec_axis(
-      transform = ~ ., 
-      breaks    = lambda_truth, 
-      labels    = expression(lambda[truth])
-    ) # パラメータラベル
-  ) + 
+  scale_x_continuous(breaks = x_vec, minor_breaks = FALSE) + # x軸目盛
   scale_color_manual(
     breaks = c("model", "predict"), 
     values = c("red", NA), 

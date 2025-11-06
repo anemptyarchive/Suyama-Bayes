@@ -96,7 +96,7 @@ prior_dens_vec = gamma.pdf(x=lambda_vec, a=a, scale=1.0/b)
 # データ数を指定
 N = 50
 
-# ポアソンモデルのデータを生成
+# 観測データを生成
 x_n = np.random.poisson(lam=lambda_truth, size=N)
 
 
@@ -134,11 +134,11 @@ posterior_dens_vec = gamma.pdf(x=lambda_vec, a=a_hat, scale=1.0/b_hat)
 
 #### 分布の作図 -----
 
-# ラベル用の文字列を作成
+# 事後分布のラベルを作成
 posterior_param_lbl  = f'$N = {N}, '
 posterior_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
 posterior_param_lbl += f'a = {a:.1f}, b = {b:.1f}, '
-posterior_param_lbl += f'\hat{{a}} == {a_hat:.1f}, \hat{{b}} == {b_hat:.1f}$'
+posterior_param_lbl += f'\hat{{a}} = {a_hat:.1f}, \hat{{b}} = {b_hat:.1f}$'
 
 # 事後分布を作図
 fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
@@ -201,10 +201,10 @@ predict_prob_vec = nbinom.pmf(k=x_vec, n=r_hat, p=p_hat)
 
 #### 分布の作図 -----
 
-# ラベル用の文字列を作成
+# 予測分布のラベルを作成
 predict_param_lbl  = f'$N = {N}, '
 predict_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
-predict_param_lbl += f'\hat{{r}} == {r_hat:.1f}, \hat{{p}} == {p_hat:.5f}$'
+predict_param_lbl += f'\hat{{r}} = {r_hat:.1f}, \hat{{p}} = {p_hat:.5f}$'
 
 # 予測分布を作図
 fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
@@ -226,11 +226,6 @@ ax.set_ylabel('probability')
 ax.set_title(predict_param_lbl, loc='left') # パラメータラベル
 ax.legend(prop={'size': 8})
 ax.grid(zorder=0)
-ax.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
-
-ax2 = ax.twiny() # 第2軸の設定用
-ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{truth}$']) # パラメータラベル
-ax2.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
 
 plt.show()
 

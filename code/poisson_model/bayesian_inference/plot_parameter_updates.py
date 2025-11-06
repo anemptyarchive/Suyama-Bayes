@@ -31,13 +31,13 @@ lambda_truth = 4.0
 
 ### 観測データの生成 -----
 
-# (ノートとの対応用)
-np.random.seed(86)
+# シードを設定(ノートとの対応用)
+#np.random.seed(86)
 
 # データ数(試行回数)を指定
 N = 100
 
-# ポアソンモデルのデータを生成
+# 観測データを生成
 x_n = np.random.poisson(lam=lambda_truth, size=N)
 
 
@@ -77,7 +77,6 @@ lambda_vec = np.linspace(start=lambda_min, stop=lambda_max, num=1001)
 a = 1.0
 b = 1.0
 
-
 # 予測分布のパラメータを計算:式(3.44)
 r = a
 q = 1.0 / (1.0 + b)
@@ -89,7 +88,7 @@ trace_b_lt = [b]
 trace_r_lt = [r]
 trace_p_lt = [p]
 
-# パラメータを更新
+# ベイズ推論による更新
 for n in range(N):
 
     # 観測データを取得
@@ -105,7 +104,7 @@ for n in range(N):
     p = b / (1.0 + b)
     #r += x
     #q = 1.0 / (1.0 + 1.0/q)
-    p = 1.0 - q
+    #p = 1.0 - q
     
     # 更新値を記録
     trace_a_lt.append(a)
@@ -124,7 +123,6 @@ for n in range(N):
 # 事前分布のパラメータを初期化
 a = 1.0
 b = 1.0
-
 
 # 事後分布のパラメータを計算:式(3.38)
 trace_a_lt = np.hstack(
@@ -160,6 +158,7 @@ anim_posterior_lt = [
 u = 0.05
 dens_max = np.max(anim_posterior_lt)
 dens_max = np.ceil(dens_max /u)*u # u単位で切り上げ
+print(dens_max)
 
 # 図を初期化
 fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
@@ -184,7 +183,7 @@ def update(i):
     b = trace_b_lt[i] # 尺度パラメータ
     posterior_dens_vec = anim_posterior_lt[i] # 確率密度
     
-    # ラベル用の文字列を作成
+    # 事後分布のラベルを作成
     posterior_param_lbl  = f'$N = {n}, '
     posterior_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
     posterior_param_lbl += f'\hat{{a}} = {a:.1f}, \hat{{b}} = {b:.1f}$'
@@ -225,7 +224,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/poisson/parameter_updates/posterior.mp4', 
+    filename='../../figure/poisson_model/parameter_updates/posterior.mp4', 
     progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
 )
 
@@ -247,11 +246,11 @@ anim_predict_lt = [
 u = 0.05
 prob_max = np.max(anim_predict_lt)
 prob_max = np.ceil(prob_max /u)*u # u単位で切り上げ
+print(prob_max)
 
 # 図を初期化
 fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
 fig.suptitle('Negative Binomial distribution', fontsize=20)
-ax2 = ax.twiny() # 第2軸の設定用
 
 # 初期化処理を定義
 def init():
@@ -262,7 +261,6 @@ def update(i):
 
     # 前フレームのグラフを初期化
     ax.cla()
-    ax2.cla()
     
     # 値を取得
     n = i # データ番号
@@ -271,7 +269,7 @@ def update(i):
     p = trace_p_lt[i] # 成功確率パラメータ
     predict_prob_vec = anim_predict_lt[i] # 確率
     
-    # ラベル用の文字列を作成
+    # 予測分布のラベルを作成
     predict_param_lbl  = f'$N = {n}, '
     predict_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
     predict_param_lbl += f'\hat{{r}} = {r:.1f}, \hat{{p}} = {p:.5f}$'
@@ -301,10 +299,6 @@ def update(i):
     ax.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # 描画範囲を固定
     ax.set_ylim(ymin=0.0, ymax=prob_max) # 描画範囲を固定
 
-    # 第2軸を描画
-    ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{truth}$']) # パラメータラベル
-    ax2.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
-
 # 動画を作成
 anim = FuncAnimation(
     fig=fig, func=update, init_func=init, 
@@ -313,15 +307,10 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/poisson/parameter_updates/predict.mp4', 
+    filename='../../figure/poisson_model/parameter_updates/predict.mp4', 
     progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
 )
 
-
-# %%
-
-print(x_n[:0])
-print(np.mean(x_n[:0]))
 
 # %%
 
@@ -360,8 +349,7 @@ def update(i):
     r = trace_r_lt[i] # 成功回数パラメータ
     p = trace_p_lt[i] # 成功確率パラメータ
     posterior_dens_vec = anim_posterior_lt[i] # 確率密度
-    predict_prob_vec = anim_predict_lt[i] # 確率
-
+    predict_prob_vec   = anim_predict_lt[i] # 確率
     
     ##### 観測データの作図 -----
 
@@ -375,8 +363,7 @@ def update(i):
     obs_freq_vec    = np.array([np.sum(x_n[:n] == x) for x in x_vec]) # 度数
     obs_relfreq_vec = obs_freq_vec / n                                # 相対度数
 
-
-    # ラベル用の文字列を作成
+    # 生成分布のラベルを作成
     model_param_lbl  = f'$N = {n}, '
     model_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
     model_param_lbl += f'E[x] = \\lambda_{{truth}} = {E_x:.2f}, '
@@ -445,15 +432,14 @@ def update(i):
     ax2y.yaxis.set_label_position(position='right') # (ラベルの表示位置が初期化される対策)
     ax2y.set_ylim(ymin=0.0, ymax=freq_max) # (目盛の共通化用)
 
-
     ##### 事後分布の作図 -----
     
     # 事後分布の期待値を計算
     E_lambda = a / b
 
-
-    # ラベル用の文字列を作成
-    posterior_param_lbl = f'$\hat{{a}} = {a:.1f}, \hat{{b}} = {b:.1f}$'
+    # 事後分布のラベルを作成
+    posterior_param_lbl  = f'$\hat{{a}} = {a:.1f}, \hat{{b}} = {b:.1f}, '
+    posterior_param_lbl += f'E[\\lambda] = \\frac{{a}}{{b}} = {E_lambda:.2f}$'
 
     # 事後分布を描画
     ax = axes[1]
@@ -489,7 +475,7 @@ def update(i):
     ax.set_title('Gamma distribution', loc='left')
     ax.legend(loc='upper right', prop={'size': 8})
     ax.grid(zorder=0)
-    ax.set_xlim(xmin=lambda_min-0.5, xmax=lambda_max+0.5) # (目盛の共通化用)
+    ax.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
     ax.set_ylim(ymin=0.0, ymax=dens_max) # 描画範囲を固定
     
     # 第2軸を描画
@@ -498,17 +484,16 @@ def update(i):
         ticks =[lambda_truth, E_lambda+1e-10], 
         labels=['$\\lambda_{{truth}}$', '$E[\\lambda]$']
     ) # パラメータラベル
-    ax2.set_xlim(xmin=lambda_min-0.5, xmax=lambda_max+0.5) # (目盛の共通化用)
-
+    ax2.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
 
     ##### 予測分布の作図 -----
   
     # 予測分布の期待値を計算
-    E_x = r * (1.0 - p) / p
+    E_x = r * (1.0-p) / p
     
-
-    # ラベル用の文字列を作成
-    predict_param_lbl = f'$\hat{{r}} = {r:.1f}, \hat{{p}} = {p:.5f}$'
+    # 予測分布のラベルを作成
+    predict_param_lbl  = f'$\hat{{r}} = {r:.1f}, \hat{{p}} = {p:.5f}, '
+    predict_param_lbl += f'E[x] = \\frac{{r (1-p)}}{{p}} = {E_x:.2f}$'
 
     # 予測分布を描画
     ax = axes[2]
@@ -569,7 +554,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/poisson/parameter_updates/observation.mp4', 
+    filename='../../figure/poisson_model/parameter_updates/observation.mp4', 
     progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
 )
 

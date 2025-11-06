@@ -6,7 +6,7 @@
 # 推論アルゴリズムの実装
 
 
-# ライブラリの読込 -------------------------------------------------------------
+# パッケージの読込 -------------------------------------------------------------
 
 # 利用パッケージ
 library(tidyverse)
@@ -18,6 +18,8 @@ library(ggplot2)
 # ベイズ推論の実装 -------------------------------------------------------------
 
 ### 生成分布(ベルヌーイ分布)の設定 -----
+
+#### パラメータの設定 -----
 
 # 真のパラメータを指定
 mu_truth <- 0.25
@@ -116,7 +118,7 @@ posterior_df <- tibble::tibble(
 
 #### 分布の作図 -----
 
-# ラベル用の文字列を作成
+# 事後分布のラベルを作成
 posterior_param_lbl <- paste0(
   "list(", 
   "N == ", N, ", ", 
@@ -184,13 +186,13 @@ mu_star_hat <- a_hat / (a_hat + b_hat)
 predict_df <- tibble::tibble(
   x    = x_vec, # x軸の値
   mu   = mu_star_hat, # 成功確率パラメータ
-  prob = c(1 - mu_star_hat, mu_star_hat) # 確率
+  prob = c(1-mu_star_hat, mu_star_hat) # 確率
 )
 
 
 #### 分布の作図 -----
 
-# ラベル用の文字列を作成
+# 予測分布のラベルを作成
 predict_param_lbl <- paste0(
   "list(", 
   "N == ", N, ", ", 
@@ -214,6 +216,7 @@ ggplot() +
     stat = "identity", position = "identity", 
     fill = "purple", alpha = 0.5, linetype = "blank"
   ) + # 予測分布
+  scale_x_continuous(breaks = x_vec, minor_breaks = FALSE) + # x軸目盛
   scale_color_manual(
     breaks = c("model", "predict"), 
     values = c("red", NA), 

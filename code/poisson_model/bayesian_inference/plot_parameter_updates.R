@@ -6,7 +6,7 @@
 # 学習推移の可視化
 
 
-# ライブラリの読込 -------------------------------------------------------------
+# パッケージの読込 -------------------------------------------------------------
 
 # 利用パッケージ
 library(tidyverse)
@@ -32,7 +32,7 @@ set.seed(86)
 # データ数(試行回数)を指定
 N <- 100
 
-# ポアソンモデルのデータを生成
+# 観測データを生成
 x_n <- rpois(n = N ,lambda = lambda_truth)
 
 
@@ -68,7 +68,6 @@ lambda_vec <- seq(from = lambda_min, to = lambda_max, length.out = 1001)
 a <- 1
 b <- 1
 
-
 # 予測分布のパラメータを計算:式(3.44)
 r <- a
 q <- 1 / (1 + b)
@@ -86,7 +85,7 @@ trace_b_i[1] <- b
 trace_r_i[1] <- r
 trace_p_i[1] <- p
 
-# パラメータを更新
+# ベイズ推論による更新
 for(n in 1:N) {
   
   # 観測データを取得
@@ -121,7 +120,6 @@ for(n in 1:N) {
 a <- 1
 b <- 1
 
-
 # 事後分布のパラメータを計算:式(3.38)
 trace_a_i <- c(a, cumsum(x_n) + a)
 trace_b_i <- 0:N + b
@@ -135,7 +133,7 @@ trace_p_i <- (0:N + b) / (1 + 0:N + b)
 ### 推移の作図 -----
 
 # 観測データを格納
-anim_obs_df <- tibble::tibble(
+anim_sample_df <- tibble::tibble(
   n = 0:N,       # データ番号
   x = c(NA, x_n) # 観測値
 )
@@ -154,7 +152,7 @@ anim_posterior_df <- tidyr::expand_grid(
     dens = dgamma(x = lambda, shape = a, rate = b) # 確率密度
   )
 
-# ラベル用の文字列を作成
+# 事後分布のラベルを作成
 anim_param_df <- tibble::tibble(
   n = 0:N, 
   a = trace_a_i, 
@@ -183,7 +181,7 @@ posterior_graph <- ggplot() +
   ) + # 事後分布
   geom_point(
     data    = anim_sample_df, 
-    mapping = aes(x = x, y = 0, color = "sample"), 
+    mapping = aes(x = x, y = -Inf, color = "sample"), 
     na.rm = TRUE, 
     size = 5
   ) + # 観測データ
@@ -205,7 +203,7 @@ posterior_graph <- ggplot() +
     values = c("red", "purple", "hotpink"), 
     labels = c("true parameter", "posterior distribution", "observation data"), 
     name   = ""
-  ) + # (凡例表示用)
+  ) + # (凡例の表示用)
   guides(
     color = guide_legend(
       override.aes = list(
@@ -224,7 +222,7 @@ posterior_graph <- ggplot() +
   labs(
     title = "Gamma distribution", 
     subtitle = "", # (パラメータラベル用の空行)
-    x = expression(lambda), 
+    x = "λ", 
     y = "density"
   )
 
@@ -233,13 +231,13 @@ gganimate::animate(
   plot = posterior_graph, 
   nframes = N+1, fps = 10, 
   width = 9, height = 6, units = "in", res = 100, 
-  renderer = gganimate::av_renderer(file = "figure/poisson/parameter_updates/posterior.mp4")
+  renderer = gganimate::av_renderer(file = "figure/poisson_model/parameter_updates/posterior.mp4")
 )
 
 
 #### 予測分布の作図 -----
 
-# 生成分布の確率を計算:式(2.37)
+# 生成分布の確率を計算
 anim_model_df <- tidyr::expand_grid(
   n = 0:N, # データ番号
   tibble::tibble(
@@ -249,7 +247,7 @@ anim_model_df <- tidyr::expand_grid(
   )
 ) # 試行ごとに分布を複製
 
-# 予測分布の確率を計算:式(3.44)
+# 予測分布の確率を計算
 anim_predict_df <- tidyr::expand_grid(
   n = 0:N,  # 試行回数
   x = x_vec # 確率変数
@@ -260,7 +258,7 @@ anim_predict_df <- tidyr::expand_grid(
     prob = dnbinom(x = x, size = r, prob = p), # 確率
   )
 
-# ラベル用の文字列を作成
+# 予測分布のラベルを作成
 anim_param_df <- tibble::tibble(
   n = 0:N, 
   r = trace_r_i, 
@@ -292,30 +290,22 @@ predict_graph <- ggplot() +
   ) + # 予測分布
   geom_point(
     data    = anim_sample_df, 
-    mapping = aes(x = x, y = 0, color = "sample"), 
+    mapping = aes(x = x, y = -Inf, color = "sample"), 
     na.rm = TRUE, 
     size = 5
   ) + # 観測データ
   geom_text(
     data    = anim_param_df, 
     mapping = aes(x = -Inf, y = Inf, label = predict_param_lbl), 
-    parse = TRUE, hjust = 0, vjust = -1
+    parse = TRUE, hjust = 0, vjust = -0.5
   ) + # パラメータラベル
   gganimate::transition_manual(frames = n) + # フレーム制御
-  scale_x_continuous(
-    breaks = x_vec, minor_breaks = FALSE, 
-    sec.axis = sec_axis(
-      transform = ~ ., 
-      breaks    = lambda_truth, 
-      labels    = expression(lambda[truth])
-    ) # パラメータラベル
-  ) + 
   scale_color_manual(
     breaks = c("model", "predict", "sample"), 
     values = c("red", NA, "hotpink"), 
     labels = c("true model", "predict distribution", "observation data"), 
     name   = ""
-  ) + # (凡例表示用)
+  ) + # (凡例の表示用)
   guides(
     color = guide_legend(
       override.aes = list(
@@ -335,7 +325,7 @@ predict_graph <- ggplot() +
   labs(
     title = "Negative Binomial distribution", 
     subtitle = "", # (パラメータラベル用の空行)
-    x = expression(x), 
+    x = "x", 
     y = "probability"
   )
 
@@ -344,7 +334,7 @@ gganimate::animate(
   plot = predict_graph, 
   nframes = N+1, fps = 10, 
   width = 9, height = 6, units = "in", res = 100, 
-  renderer = gganimate::av_renderer(file = "figure/poisson/parameter_updates/predict.mp4")
+  renderer = gganimate::av_renderer(file = "figure/poisson_model/parameter_updates/predict.mp4")
 )
 
 
@@ -367,6 +357,7 @@ prob_max <- dnbinom(
 ) |> 
   max() |> 
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
+prob_max
 
 # 確率密度軸の範囲を設定
 u <- 0.05
@@ -377,11 +368,13 @@ dens_max <- dgamma(
 ) |> 
   max() |> 
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
+dens_max
 
+# 試行ごとに作図
 for(i in 1:(N+1)) {
   
   # 値を取得
-  n <- i - 1 # データ番号
+  n <- i - 1  # データ番号
   x <- x_n[n] # 観測値
   a <- trace_a_i[i] # 形状パラメータ
   b <- trace_b_i[i] # 尺度パラメータ
@@ -393,7 +386,6 @@ for(i in 1:(N+1)) {
     x = x # 観測値
   )
   
-  
   ##### 観測データの作図 -----
   
   # 生成分布の期待値を計算
@@ -402,7 +394,7 @@ for(i in 1:(N+1)) {
   # 観測データの標本平均を計算
   bar_x = mean(x_n[0:n])
   
-  # 生成分布の確率を計算:式(2.37)
+  # 生成分布の確率を計算
   model_df <- tibble::tibble(
     x    = x_vec, # 確率変数
     prob = dpois(x = x, lambda = lambda_truth) # 確率
@@ -423,8 +415,7 @@ for(i in 1:(N+1)) {
       fill = list(freq = 0, rel_freq = 0)
     ) # 未観測値を補完
   
-  
-  # ラベル用の文字列を作成
+  # 生成分布のラベルを作成
   model_param_lbl <- paste0(
     "list(", 
     "N == ", n, ", ", 
@@ -434,6 +425,20 @@ for(i in 1:(N+1)) {
     ")"
   ) |> 
     parse(text = _)
+  
+  # (目盛の共通化用)
+  dummy_graph <- ggplot() + 
+    geom_bar(
+      data    = model_df, 
+      mapping = aes(x = x, y = prob), 
+      stat = "identity", position = "identity"
+    ) + # 真の分布
+    coord_cartesian(
+      ylim = c(0, prob_max) # (目盛の共通化用)
+    )
+  built     <- ggplot_build(dummy_graph) # 図情報を取得
+  prob_vals <- built$layout$panel_params[[1]]$y$breaks         # 確率軸目盛を取得
+  freq_vals <- prob_vals * ifelse(test = n>0, yes = n, no = 1) # 度数軸目盛に変換
   
   # 観測データを作図
   model_graph <- ggplot() + 
@@ -471,14 +476,27 @@ for(i in 1:(N+1)) {
       ) # パラメータラベル
     ) + 
     scale_y_continuous(
-      sec.axis = sec_axis(transform = ~ .*N, name = "frequency")
+      breaks = prob_vals, # (目盛の共通化用)
+      sec.axis = sec_axis(
+        transform = ~ .*ifelse(test = n>0, yes = n, no = 1), 
+        breaks    = freq_vals, # (目盛の共通化用)
+        labels    = scales::label_number(accuracy = 0.01), # (描画領域のズレの対策用)
+        name      = "frequency"
+      )
     ) + # 度数軸目盛
     scale_color_manual(
       breaks = c("model", "sample"), 
       values = c("red", NA), 
       labels = c("true model", "observation data"), 
       name   = ""
-    ) + # (凡例表示用)
+    ) + # (凡例の表示用)
+    theme(
+      legend.title           = element_text(size = 0), 
+      legend.position        = "inside", 
+      legend.position.inside = c(1, 1), 
+      legend.justification   = c(1, 1), 
+      legend.background      = element_rect(fill = alpha("white", alpha = 0.8))
+    ) + 
     guides(
       color = guide_legend(
         override.aes = list(
@@ -488,8 +506,8 @@ for(i in 1:(N+1)) {
       )
     ) + 
     coord_cartesian(
-      xlim = c(x_min, x_max), # (目盛の共通化用)
-      ylim = c(0, prob_max)
+      xlim = c(x_min-0.5, x_max+0.5), # (目盛の共通化用)
+      ylim = c(0, prob_max) # (目盛の共通化用)
     ) + 
     labs(
       title = "Poisson distribution", 
@@ -497,22 +515,19 @@ for(i in 1:(N+1)) {
       x = expression(x), 
       y = "probability"
     )
-  model_graph
-  
   
   ##### 事後分布の作図 -----
   
   # 事後分布の期待値を計算
   E_lambda <- a / b
   
-  # 事後分布の確率を計算:式(3.38)
+  # 事後分布の確率を計算
   posterior_df <- tibble::tibble(
     lambda = lambda_vec, # 確率変数
     dens   = dgamma(x = lambda, shape = a, rate = b) # 確率密度
   )
   
-  
-  # ラベル用の文字列を作成
+  # 事後分布のラベルを作成
   posterior_param_lbl <- paste0(
     "list(", 
     "hat(a) == ", round(a, digits = 1), ", ", 
@@ -525,8 +540,8 @@ for(i in 1:(N+1)) {
   # 事後分布を作図
   posterior_graph <- ggplot() + 
     geom_vline(
-      mapping = aes(xintercept = lambda_truth), 
-      color = "red", linewidth = 1, linetype = "dashed"
+      mapping = aes(xintercept = lambda_truth, color = "model"), 
+      linewidth = 1, linetype = "dashed"
     ) + # 真のパラメータ
     geom_vline(
       mapping = aes(xintercept = E_lambda), 
@@ -551,16 +566,23 @@ for(i in 1:(N+1)) {
       ) # パラメータラベル
     ) + 
     scale_color_manual(
-      breaks = "posterior", 
-      values = "purple", 
-      labels = "posterior distribution", 
+      breaks = c("model", "posterior"), 
+      values = c("red", "purple"), 
+      labels = c("true parameter", "posterior distribution"), 
       name   = ""
-    ) + # (凡例表示用)
+    ) + # (凡例の表示用)
+    theme(
+      legend.title           = element_text(size = 0), 
+      legend.position        = "inside", 
+      legend.position.inside = c(1, 1), 
+      legend.justification   = c(1, 1), 
+      legend.background      = element_rect(fill = alpha("white", alpha = 0.8))
+    ) + 
     guides(
       color = guide_legend(override.aes = list(linewidth = 0.5))
     ) + 
     coord_cartesian(
-      xlim = c(lambda_min, lambda_max), # (目盛の共通化用)
+      xlim = c(x_min-0.5, x_max+0.5), # (目盛の共通化用)
       ylim = c(0, dens_max)
     ) + 
     labs(
@@ -569,21 +591,19 @@ for(i in 1:(N+1)) {
       x = expression(lambda), 
       y = "density"
     )
-  posterior_graph
-  
   
   ##### 予測分布の作図 -----
   
   # 予測分布の期待値を計算
-  E_x <- r * (1 - p) / p
+  E_x <- r * (1-p) / p
   
-  # 予測分布の確率を計算:式(3.44)
+  # 予測分布の確率を計算
   predict_df <- tibble::tibble(
-    x = x_vec, # 確率変数
+    x    = x_vec, # 確率変数
     prob = dnbinom(x = x, size = r, prob = p), # 確率
   )
   
-  # ラベル用の文字列を作成
+  # 予測分布のラベルを作成
   predict_param_lbl <- paste0(
     "list(", 
     "hat(r) == ", round(r, digits = 1), ", ", 
@@ -593,7 +613,7 @@ for(i in 1:(N+1)) {
   ) |> 
     parse(text = _)
   
-  # 予測分布のアニメーションを作図
+  # 予測分布を作図
   predict_graph <- ggplot() + 
     geom_vline(
       mapping = aes(xintercept = lambda_truth), 
@@ -605,9 +625,9 @@ for(i in 1:(N+1)) {
     ) + # 期待値
     geom_bar(
       data    = model_df, 
-      mapping = aes(x = x, y = prob), 
+      mapping = aes(x = x, y = prob, color = "model"), 
       stat = "identity", position = "identity",
-      fill = NA, color = "red", linewidth = 1, linetype = "dashed"
+      fill = NA, linewidth = 1, linetype = "dashed"
     ) + # 真の分布
     geom_bar(
       data    = predict_df, 
@@ -629,16 +649,28 @@ for(i in 1:(N+1)) {
       ) # パラメータラベル
     ) + 
     scale_color_manual(
-      breaks = "predict", 
-      values = NA, 
-      labels = "predict distribution", 
+      breaks = c("model", "predict"), 
+      values = c("red", NA), 
+      labels = c("true model", "predict distribution"), 
       name   = ""
-    ) + # (凡例表示用)
+    ) + # (凡例の表示用)
+    theme(
+      legend.title           = element_text(size = 0), 
+      legend.position        = "inside", 
+      legend.position.inside = c(1, 1), 
+      legend.justification   = c(1, 1), 
+      legend.background      = element_rect(fill = alpha("white", alpha = 0.8))
+    ) + 
     guides(
-      color = guide_legend(override.aes = list(linetype  = "blank"))
+      color = guide_legend(
+        override.aes = list(
+          linewidth = c(0.5, 0), 
+          linetype  = c("dashed", "blank")
+        )
+      )
     ) + 
     coord_cartesian(
-      xlim = c(x_min, x_max), # (目盛の共通化用)
+      xlim = c(x_min-0.5, x_max+0.5), # (目盛の共通化用)
       ylim = c(0, prob_max)
     ) + 
     labs(
@@ -647,10 +679,15 @@ for(i in 1:(N+1)) {
       x = expression(x), 
       y = "probability"
     )
-  predict_graph
   
+  ##### 対応関係の作図 -----
   
-  ##### グラフの出力 -----
+  # 図タイトルを指定
+  title_graph <- cowplot::ggdraw() + 
+    cowplot::draw_label(
+      label = "Bayesian inference", 
+      size = 20
+    )
   
   # グラフを並べて描画
   comb_graph <- cowplot::plot_grid(
@@ -658,7 +695,13 @@ for(i in 1:(N+1)) {
     nrow = 3, ncol = 1, 
     align = "hv" # (目盛の共通化用)
   )
-  comb_graph
+  final_graph <- cowplot::plot_grid(
+    title_graph, comb_graph, 
+    nrow = 2, ncol = 1, 
+    rel_heights = c(0.1, 1)
+  )
+  
+  ##### グラフの出力 -----
   
   # 画像ファイルを書出
   file_path <- paste0(dir_path, "/", stringr::str_pad(n, width = nchar(N), pad = "0"), ".png")
@@ -675,6 +718,6 @@ for(i in 1:(N+1)) {
 paste0(dir_path, "/", stringr::str_pad(0:N, width = nchar(N), pad = "0"), ".png") |> # ファイルパスを作成
   magick::image_read() |> # pngファイルを読込
   magick::image_animate(fps = 1, dispose = "previous") |> # gifファイルを作成
-  magick::image_write_video(path = "figure/poisson/parameter_updates/observation.mp4", framerate = 10) -> tmp_path # mp4ファイルを書出
+  magick::image_write_video(path = "figure/poisson_model/parameter_updates/observation.mp4", framerate = 10) -> tmp_path # mp4ファイルを書出
 
 

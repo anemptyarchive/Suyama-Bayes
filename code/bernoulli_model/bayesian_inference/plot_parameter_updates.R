@@ -6,7 +6,7 @@
 # 学習推移の可視化
 
 
-# ライブラリの読込 -------------------------------------------------------------
+# パッケージの読込 -------------------------------------------------------------
 
 # 利用パッケージ
 library(tidyverse)
@@ -136,7 +136,7 @@ anim_posterior_df <- tidyr::expand_grid(
     dens = dbeta(x = mu, shape1 = a, shape2 = b) # 確率密度
   )
 
-# ラベル用の文字列を作成
+# 事後分布のラベルを作成
 anim_param_df <- tibble::tibble(
   n = 0:N, 
   a = trace_a_i, 
@@ -242,7 +242,7 @@ anim_predict_df <- tidyr::expand_grid(
   )
 
 
-# ラベル用の文字列を作成
+# 予測分布のラベルを作成
 anim_param_df <- tibble::tibble(
   n  = 0:N, 
   mu = trace_mu_i, 
@@ -250,7 +250,7 @@ anim_param_df <- tibble::tibble(
     "list(", 
     "N == ", n, ", ", 
     "mu[truth] == ", round(mu_truth, digits = 2), ", ", 
-    "hat(mu)[star] == ", round(mu, digits = 1), 
+    "hat(mu)[star] == ", round(mu, digits = 5), 
     ")"
   )
 )
@@ -387,13 +387,13 @@ for(i in 1:(N+1)) {
     rel_freq = freq / n # 相対度数
   )
   
-  # ラベル用の文字列を作成
+  # 生成分布のラベルを作成
   model_param_lbl <- paste0(
     "list(", 
     "N == ", n, ", ", 
     "mu[truth] == ", round(mu_truth, digits = 2), ", ", 
     "paste(E(x) == mu[truth], {} == ", round(E_x, digits = 2), ")", ", ", 
-    "bar(x) == ", round(bar_x, digits = 2), 
+    "bar(x) == ", round(bar_x, digits = 5), 
     ")"
   ) |> 
     parse(text = _)
@@ -499,12 +499,12 @@ for(i in 1:(N+1)) {
     dens = dbeta(x = mu, shape1 = a, shape2 = b) # 確率密度
   )
   
-  # ラベル用の文字列を作成
+  # 事後分布のラベルを作成
   posterior_param_lbl <- paste0(
     "list(", 
     "hat(a) == ", round(a, digits = 1), ", ", 
     "hat(b) == ", round(b, digits = 1), ", ", 
-    "paste(E(mu) == frac(a, a+b), {} == ", round(E_mu, digits = 2), ")", 
+    "paste(E(mu) == frac(a, a+b), {} == ", round(E_mu, digits = 5), ")", 
     ")"
   ) |> 
     parse(text = _)
@@ -575,11 +575,11 @@ for(i in 1:(N+1)) {
     prob = c(1-mu_star, mu_star) # 確率
   )
   
-  # ラベル用の文字列を作成
+  # 予測分布のラベルを作成
   predict_param_lbl <- paste0(
     "list(", 
-    "hat(mu)[star] == ", round(mu_star, digits = 2), ", ", 
-    "paste(E(x) == hat(mu)[star], {} == ", round(E_x, digits = 2), ")", 
+    "hat(mu)[star] == ", round(mu_star, digits = 5), ", ", 
+    "paste(E(x) == hat(mu)[star], {} == ", round(E_x, digits = 5), ")", 
     ")"
   ) |> 
     parse(text = _)
@@ -690,6 +690,5 @@ paste0(dir_path, "/", stringr::str_pad(0:N, width = nchar(N), pad = "0"), ".png"
   magick::image_read() |> # pngファイルを読込
   magick::image_animate(fps = 1, dispose = "previous") |> # gifファイルを作成
   magick::image_write_video(path = "figure/bernoulli_model/parameter_updates/observation.mp4", framerate = 10) -> tmp_path # mp4ファイルを書出
-
 
 
