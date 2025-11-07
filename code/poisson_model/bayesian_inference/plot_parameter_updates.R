@@ -532,7 +532,7 @@ for(i in 1:(N+1)) {
     "list(", 
     "hat(a) == ", round(a, digits = 1), ", ", 
     "hat(b) == ", round(b, digits = 1), ", ", 
-    "paste(E(lambda) == frac(a, b), {} == ", round(E_lambda, digits = 2), ")", 
+    "paste(E(lambda) == frac(hat(a), hat(b)), {} == ", round(E_lambda, digits = 2), ")", 
     ")"
   ) |> 
     parse(text = _)
@@ -608,7 +608,7 @@ for(i in 1:(N+1)) {
     "list(", 
     "hat(r) == ", round(r, digits = 1), ", ", 
     "hat(p) == ", round(p, digits = 5), ", ", 
-    "paste(E(x) == frac(r * (1-p), p), {} == ", round(E_x, digits = 2), ")", 
+    "paste(E(x) == frac(hat(r) * (1-hat(p)), hat(p)), {} == ", round(E_x, digits = 2), ")", 
     ")"
   ) |> 
     parse(text = _)
@@ -687,6 +687,9 @@ for(i in 1:(N+1)) {
     cowplot::draw_label(
       label = "Bayesian inference", 
       size = 20
+    ) + 
+    theme(
+      plot.background = element_rect(fill = "white", color = NA) # (透過背景の対策用)
     )
   
   # グラフを並べて描画
@@ -698,7 +701,7 @@ for(i in 1:(N+1)) {
   final_graph <- cowplot::plot_grid(
     title_graph, comb_graph, 
     nrow = 2, ncol = 1, 
-    rel_heights = c(0.1, 1)
+    rel_heights = c(0.05, 1)
   )
   
   ##### グラフの出力 -----
@@ -706,7 +709,7 @@ for(i in 1:(N+1)) {
   # 画像ファイルを書出
   file_path <- paste0(dir_path, "/", stringr::str_pad(n, width = nchar(N), pad = "0"), ".png")
   ggplot2::ggsave(
-    filename = file_path, plot = comb_graph, 
+    filename = file_path, plot = final_graph, 
     width = 9, height = 12, units = "in", dpi = 100
   )
   

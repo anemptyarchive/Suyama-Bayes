@@ -182,7 +182,7 @@ mu_star_hat <- a_hat / (a_hat + b_hat)
 
 #### 分布の計算 -----
 
-# 予測分布を計算
+# 予測分布の確率を計算
 predict_df <- tibble::tibble(
   x    = x_vec, # x軸の値
   mu   = mu_star_hat, # 成功確率パラメータ
@@ -197,7 +197,7 @@ predict_param_lbl <- paste0(
   "list(", 
   "N == ", N, ", ", 
   "mu[truth] == ", round(mu_truth, digits = 2), ", ", 
-  "hat(mu)[star] == ", round(mu_star_hat, digits = 1), 
+  "hat(mu)['*'] == ", round(mu_star_hat, digits = 1), 
   ")"
 ) |> 
   parse(text = _)

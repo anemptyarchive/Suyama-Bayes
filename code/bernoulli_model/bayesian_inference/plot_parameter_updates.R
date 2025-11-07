@@ -108,9 +108,9 @@ b <- 1
 
 # 事後分布のパラメータを更新:式(3.15)
 trace_a_i <- c(a, cumsum(x_n) + a)
-trace_b_i <- c(a, 1:N - cumsum(x_n) + a)
+trace_b_i <- c(b, 1:N - cumsum(x_n) + b)
 
-# 予測分布のパラメーターを更新:式(3.19)
+# 予測分布のパラメーターを更新:式(3.19')
 trace_mu_i <- trace_a_i / (trace_a_i + trace_b_i)
 
 
@@ -250,7 +250,7 @@ anim_param_df <- tibble::tibble(
     "list(", 
     "N == ", n, ", ", 
     "mu[truth] == ", round(mu_truth, digits = 2), ", ", 
-    "hat(mu)[star] == ", round(mu, digits = 5), 
+    "hat(mu)['*'] == ", round(mu, digits = 5), 
     ")"
   )
 )
@@ -326,7 +326,7 @@ dir_path <- "figure/tmp_folder"
 
 
 # 確率軸の範囲を設定
-u <- 0.05
+u <- 0.25
 prob_max <- dbinom(
   x    = ifelse(
     test = trace_mu_i >= 0, 
@@ -504,7 +504,7 @@ for(i in 1:(N+1)) {
     "list(", 
     "hat(a) == ", round(a, digits = 1), ", ", 
     "hat(b) == ", round(b, digits = 1), ", ", 
-    "paste(E(mu) == frac(a, a+b), {} == ", round(E_mu, digits = 5), ")", 
+    "paste(E(mu) == frac(hat(a), hat(a) + hat(b)), {} == ", round(E_mu, digits = 5), ")", 
     ")"
   ) |> 
     parse(text = _)
@@ -578,8 +578,8 @@ for(i in 1:(N+1)) {
   # 予測分布のラベルを作成
   predict_param_lbl <- paste0(
     "list(", 
-    "hat(mu)[star] == ", round(mu_star, digits = 5), ", ", 
-    "paste(E(x) == hat(mu)[star], {} == ", round(E_x, digits = 5), ")", 
+    "hat(mu)['*'] == ", round(mu_star, digits = 5), ", ", 
+    "paste(E(x) == hat(mu)['*'], {} == ", round(E_x, digits = 5), ")", 
     ")"
   ) |> 
     parse(text = _)
@@ -658,6 +658,9 @@ for(i in 1:(N+1)) {
     cowplot::draw_label(
       label = "Bayesian inference", 
       size = 20
+    ) + 
+    theme(
+      plot.background = element_rect(fill = "white", color = NA) # (透過背景の対策用)
     )
   
   # グラフを並べて描画
@@ -669,7 +672,7 @@ for(i in 1:(N+1)) {
   final_graph <- cowplot::plot_grid(
     title_graph, comb_graph, 
     nrow = 2, ncol = 1, 
-    rel_heights = c(0.1, 1)
+    rel_heights = c(0.05, 1)
   )
   
   ##### グラフの出力 -----
@@ -677,7 +680,7 @@ for(i in 1:(N+1)) {
   # 画像ファイルを書出
   file_path <- paste0(dir_path, "/", stringr::str_pad(n, width = nchar(N), pad = "0"), ".png")
   ggplot2::ggsave(
-    filename = file_path, plot = comb_graph, 
+    filename = file_path, plot = final_graph, 
     width = 9, height = 12, units = "in", dpi = 100
   )
   

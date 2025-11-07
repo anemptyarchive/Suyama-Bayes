@@ -199,7 +199,7 @@ def update(i):
         color='purple', linewidth=1.0, 
         label='posterior distribution', zorder=11
     ) # 事後分布
-    plt.scatter(
+    ax.scatter(
         x=x, y=0.0, 
         c='hotpink', s=100, 
         label='observation data', clip_on=False, zorder=12
@@ -285,7 +285,7 @@ def update(i):
         color='purple', alpha=0.5, 
         label='predict distribution', zorder=11
     ) # 予測分布
-    plt.scatter(
+    ax.scatter(
         x=x, y=0.0, 
         c='hotpink', s=100, 
         label='observation data', clip_on=False, zorder=12
@@ -316,7 +316,8 @@ anim.save(
 
 #### 観測データと分布の関係 -----
 
-# ラベル位置の調整値を設定
+# ラベル位置を設定
+loc_x      = x_min - 0.5
 loc_margin = 0.96
 
 # 図を初期化
@@ -397,7 +398,7 @@ def update(i):
         clip_on=False, zorder=14
     ) # 観測データ
     ax.text(
-        x=x_min, y=prob_max*loc_margin, 
+        x=loc_x*loc_margin, y=prob_max*loc_margin, 
         s=model_param_lbl, ha='left', va='top', 
         bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5), 
         size = 10, 
@@ -439,7 +440,7 @@ def update(i):
 
     # 事後分布のラベルを作成
     posterior_param_lbl  = f'$\hat{{a}} = {a:.1f}, \hat{{b}} = {b:.1f}, '
-    posterior_param_lbl += f'E[\\lambda] = \\frac{{a}}{{b}} = {E_lambda:.2f}$'
+    posterior_param_lbl += f'E[\\lambda] = \\frac{{\hat{{a}}}}{{\hat{{b}}}} = {E_lambda:.2f}$'
 
     # 事後分布を描画
     ax = axes[1]
@@ -464,7 +465,7 @@ def update(i):
         clip_on=False, zorder=13
     ) # 観測データ
     ax.text(
-        x=lambda_min, y=dens_max*loc_margin, 
+        x=loc_x*loc_margin, y=dens_max*loc_margin, 
         s=posterior_param_lbl, ha='left', va='top', 
         bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5), 
         size = 10, 
@@ -493,7 +494,7 @@ def update(i):
     
     # 予測分布のラベルを作成
     predict_param_lbl  = f'$\hat{{r}} = {r:.1f}, \hat{{p}} = {p:.5f}, '
-    predict_param_lbl += f'E[x] = \\frac{{r (1-p)}}{{p}} = {E_x:.2f}$'
+    predict_param_lbl += f'E[x] = \\frac{{\hat{{r}} (1-\hat{{p}})}}{{\hat{{p}}}} = {E_x:.2f}$'
 
     # 予測分布を描画
     ax = axes[2]
@@ -523,7 +524,7 @@ def update(i):
         clip_on=False, zorder=14
     ) # 観測データ
     ax.text(
-        x=x_min, y=prob_max*loc_margin, 
+        x=loc_x*loc_margin, y=prob_max*loc_margin, 
         s=predict_param_lbl, ha='left', va='top', 
         bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5), 
         size = 10, 
