@@ -1,139 +1,542 @@
 
-### アニメーションによる推移の確認
+# ベルヌーイモデル -------------------------------------------------------------
 
-# 3.2.1項で利用するライブラリ
-import numpy as np
-from scipy.stats import beta # ベータ分布
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+# chapter 3.2.1
+# ベイズ推論
+# 学習推移の可視化
+
 
 #%%
 
-## モデルの設定
+# ライブラリの読込 ---------------------------------------------------------------
+
+# ライブラリを読込
+import numpy as np
+from scipy.stats import beta
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
+
+#%%
+
+# ベイズ推論の可視化 -----------------------------------------------------------
+
+### 生成分布(ベルヌーイ分布)の設定 -----
 
 # 真のパラメータを指定
 mu_truth = 0.4
 
-# 事前分布のパラメータを指定
-a = 1.0
-b = 1.0
 
-# 初期値による予測分布のパラメーターを計算
-mu_star = a / (a + b)
+# %%
 
+### 観測データの設定 -----
 
-# 事前分布のx軸の値を作成
-mu_line = np.arange(0.0, 1.001, 0.001)
-
-#%%
-
-## 推論処理
+# シードを設定(ノートとの対応用)
+#np.random.seed(86)
 
 # データ数(試行回数)を指定
 N = 100
 
-# 観測データの受け皿を作成
-x_n = np.empty(N)
+# 観測データを生成
+x_n = np.random.binomial(n=1, p=mu_truth, size=N)
 
-# 推移の記録用の受け皿を初期化
-trace_a = [a]
-trace_b = [b]
-trace_posterior = [beta.pdf(x=mu_line, a=a, b=b)]
+
+# %%
+
+#### 変数の設定 -----
+
+# x軸の範囲を設定
+x_min = 0
+x_max = 1
+
+# x軸の値を作成
+x_vec = np.arange(start=x_min, stop=x_max+1, step=1)
+
+
+# μ軸の範囲を設定
+mu_min = x_min
+mu_max = x_max
+
+# μ軸の値を作成
+mu_vec = np.linspace(start=mu_min, stop=mu_max, num=1001)
+
+
+# %%
+
+### パラメータの更新 -----
+
+#### 逐次更新の場合 -----
+
+# 事前分布のパラメータを初期化
+a = 1.0
+b = 1.0
+
+# 予測分布のパラメータを計算:式(3.19)
+mu_star = a / (a + b)
+
+# 初期値を記録
+trace_a  = [a]
+trace_b  = [b]
 trace_mu = [mu_star]
-trace_predict = [[1 - mu_star, mu_star]]
 
-# ベイズ推論
+# ベイズ推論による更新
 for n in range(N):
-    # (観測)データを生成
-    x_n[n] = np.random.binomial(n=1, p=mu_truth, size=1)
+
+    # 観測データを生成
+    x = x_n[n]
     
     # 事後分布のパラメータを更新:式(3.15)
     a += x_n[n]
-    b += 1 - x_n[n]
-    
-    # 事後分布(ベータ分布)の確率密度を計算:式(2.41)
-    trace_posterior.append(beta.pdf(x=mu_line, a=a, b=b))
+    b += 1.0 - x_n[n]
     
     # 予測分布のパラメータを更新:式(3.19)
     mu_star = a / (a + b)
     
-    # 予測分布(ベルヌーイ分布)の確率を計算:式(2.16)
-    trace_predict.append([1 - mu_star, mu_star])
-    
-    # n回目の結果を記録
+    # 更新値を記録
     trace_a.append(a)
     trace_b.append(b)
     trace_mu.append(mu_star)
 
-#%%
+    # 動作確認
+    print(f'{n+1} / {N}')
 
-## 事後分布の推移をgif画像化
 
-# 画像サイズを指定
-fig = plt.figure(figsize=(12, 9))
+# %%
 
-# 作図処理を関数として定義
-def update_posterior(n):
+#### 一括更新の場合 -----
+
+# 事前分布のパラメータを初期化
+a = 1.0
+b = 1.0
+
+# 事後分布のパラメータを計算:式(3.15)
+trace_a_lt = np.hstack(
+    [a, np.cumsum(x_n) + a]
+).tolist()
+trace_b_lt = np.hstack(
+    [a, np.arange(1, N+1) - np.cumsum(x_n) + a]
+).tolist()
+
+# 予測分布のパラメータを計算:式(3.19')
+trace_mu_lt = np.array(trace_a_lt) / (np.array(trace_a_lt) + np.array(trace_b_lt))
+
+
+# %%
+
+### 推移の作図 -----
+
+#### 事後分布の作図 -----
+
+# 事後分布の確率密度を計算
+anim_posterior_lt = [
+    beta.pdf(x=mu_vec, a=trace_a_lt[i], b=trace_b_lt[i]) for i in range(N+1)
+]
+
+
+# 確率密度軸の範囲を設定
+u = 0.05
+dens_max = np.max(anim_posterior_lt)
+dens_max = np.ceil(dens_max /u)*u # u単位で切り上げ
+print(dens_max)
+
+# 図を初期化
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
+fig.suptitle('Beta distribution', fontsize=20)
+ax2 = ax.twiny() # 第2軸の設定用
+
+# 初期化処理を定義
+def init():
+    pass
+
+# 作図処理を定義
+def update(i):
+
     # 前フレームのグラフを初期化
-    plt.cla()
+    ax.cla()
+    ax2.cla()
     
-    # n回目の事後分布を作図
-    plt.plot(mu_line, trace_posterior[n], color='purple', label='posterior') # 事後分布
-    plt.vlines(x=mu_truth, ymin=0.0, ymax=np.nanmax(trace_posterior), 
-               color='red', linestyles='--', label='true val') # 真の値
-    if n > 0: # 初回は除く
-        plt.scatter(x_n[n-1], y=0.0, s=100, label='data') # 観測データ
-    plt.xlabel('$\mu$')
-    plt.ylabel('density')
-    plt.suptitle('Beta Distribution', fontsize=20)
-    plt.title('$N=' + str(n) + 
-              ', \hat{a}=' + str(trace_a[n]) + 
-              ', \hat{b}=' + str(trace_b[n]) + '$', 
-              loc='left')
-    plt.legend() # 凡例
-    plt.grid() # グリッド線
+    # 値を取得
+    n = i # データ番号
+    x = x_n[i-1] if n > 0 else np.nan # 観測値
+    a = trace_a_lt[i] # 形状パラメータ
+    b = trace_b_lt[i] # 形状パラメータ
+    posterior_dens_vec = anim_posterior_lt[i] # 確率密度
+    
+    # 事後分布のラベルを作成
+    posterior_param_lbl  = f'$N = {n}, '
+    posterior_param_lbl += f'\\mu_{{truth}} = {mu_truth:.2f}, '
+    posterior_param_lbl += f'\hat{{a}} = {a:.1f}, \hat{{b}} = {b:.1f}$'
 
-# gif画像を作成
-posterior_anime = animation.FuncAnimation(fig, update_posterior, frames=N + 1, interval=100)
-posterior_anime.save("ch3_2_1_Posterior.gif")
+    # 事後分布を描画
+    ax.axvline(
+        x=mu_truth, 
+        color='red', linewidth=1.0, linestyle='--', 
+        label='true parameter', zorder=10
+    ) # 真のパラメータ
+    ax.plot(
+        mu_vec, posterior_dens_vec, 
+        color='purple', linewidth=1.0, 
+        label='posterior distribution', zorder=11
+    ) # 事後分布
+    ax.scatter(
+        x=x, y=0.0, 
+        c='hotpink', s=100, 
+        label='observation data', clip_on=False, zorder=12
+    ) # 観測データ
+    ax.set_xlabel('$\mu$')
+    ax.set_ylabel('density')
+    ax.set_title(posterior_param_lbl, loc='left') # パラメータラベル
+    ax.legend(loc='upper right', prop={'size': 8})
+    ax.grid(zorder=0)
+    ax.set_xlim(xmin=mu_min, xmax=mu_max) # 描画範囲を固定
+    ax.set_ylim(ymin=0.0, ymax=dens_max) # 描画範囲を固定
+    
+    # 第2軸を描画
+    ax2.set_xticks(ticks=[mu_truth], labels=['$\mu_{truth}$']) # パラメータラベル
+    ax2.set_xlim(xmin=mu_min, xmax=mu_max) # (目盛の共通化用)
 
-#%%
+# 動画を作成
+anim = FuncAnimation(
+    fig=fig, func=update, init_func=init, 
+    frames=N+1, interval=100
+)
 
-## 予測分布の推移をgif画像化
+# 動画を書出
+anim.save(
+    filename='../../figure/bernoulli_model/parameter_updates/posterior.mp4', 
+    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+)
 
-# x軸の点を作成
-x_point = np.array([0.0, 1.0])
 
-# 画像サイズを指定
-fig = plt.figure(figsize=(12, 9))
+# %%
 
-# 作図処理を関数として定義
-def update_predict(n):
+#### 予測分布の作図 -----
+
+# 生成分布の確率を計算
+model_prob_vec = np.array([1.0-mu_truth, mu_truth])
+
+# 予測分布の確率を計算
+anim_predict_lt = [
+    np.array([1.0-trace_mu_lt[i], trace_mu_lt[i]]) for i in range(N+1)
+]
+
+
+# 確率軸の範囲を設定
+u = 0.05
+prob_max = np.max(anim_predict_lt)
+prob_max = np.ceil(prob_max /u)*u # u単位で切り上げ
+print(prob_max)
+
+# 図を初期化
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
+fig.suptitle('Bernoulli distribution', fontsize=20)
+
+# 初期化処理を定義
+def init():
+    pass
+
+# 作図処理を定義
+def update(i):
+
     # 前フレームのグラフを初期化
-    plt.cla()
+    ax.cla()
     
-    # n回目の予測分布を作図
-    plt.bar(x=x_point, height=[1.0 - mu_truth, mu_truth], 
-            color='white', edgecolor='red', linestyle='--', label='true model', zorder=0) # 真の分布
-    plt.bar(x=x_point, height=trace_predict[n], 
-            alpha=0.6, color='purple', label='predict', zorder=1) # 予測分布
-    if n > 0: # 初回は除く
-        plt.scatter(x=x_n[n-1], y=0.0, s=100, label='data', zorder=2) # 観測データ
-    plt.xlabel('x')
-    plt.ylabel('prob')
-    plt.xticks(ticks=x_point, labels=x_point) # x軸目盛
-    plt.suptitle('Bernoulli Distribution', fontsize=20)
-    plt.title('$N=' + str(n) + 
-              ', \hat{\mu}_{*}=' + str(np.round(trace_mu[n], 5)) + '$', 
-              loc='left')
-    plt.legend() # 凡例
-    plt.ylim(-0.01, 1.0) # y軸の表示範囲
+    # 値を取得
+    n       = i # データ番号
+    x       = x_n[i-1] if n > 0 else np.nan # 観測値
+    mu_star = trace_mu_lt[i] # 成功確率パラメータ
+    predict_prob_vec = anim_predict_lt[i] # 確率
+    
+    # 予測分布のラベルを作成
+    predict_param_lbl  = f'$N = {n}, '
+    predict_param_lbl += f'\\mu_{{truth}} = {mu_truth:.2f}, '
+    predict_param_lbl += f'\hat{{\\mu}}_{{*}} = {mu_star:.5f}$'
 
-# gif画像を作成
-predict_anime = animation.FuncAnimation(fig, update_predict, frames=N + 1, interval=100)
-predict_anime.save("ch3_2_1_Predict.gif")
+    # 予測分布を描画
+    ax.bar(
+        x=x_vec, height=model_prob_vec, 
+        facecolor='none', edgecolor='red', linewidth=1.0, linestyle='--', 
+        label='true model', zorder=10
+    ) # 真の分布
+    ax.bar(
+        x=x_vec, height=predict_prob_vec, 
+        color='purple', alpha=0.5, 
+        label='predict distribution', zorder=11
+    ) # 予測分布
+    ax.scatter(
+        x=x, y=0.0, 
+        c='hotpink', s=100, 
+        label='observation data', clip_on=False, zorder=12
+    ) # 観測データ
+    ax.set_xticks(ticks=x_vec)
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('probability')
+    ax.set_title(predict_param_lbl, loc='left') # パラメータラベル
+    ax.legend(loc='upper right', prop={'size': 8})
+    ax.grid(zorder=0)
+    ax.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # 描画範囲を固定
+    ax.set_ylim(ymin=0.0, ymax=prob_max) # 描画範囲を固定
+
+# 動画を作成
+anim = FuncAnimation(
+    fig=fig, func=update, init_func=init, 
+    frames=N+1, interval=100
+)
+
+# 動画を書出
+anim.save(
+    filename='../../figure/bernoulli_model/parameter_updates/predict.mp4', 
+    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+)
+
+
+# %%
+
+#### 観測データと分布の関係 -----
+
+# ラベル位置を設定
+loc_x      = x_min - 0.5
+loc_margin = 0.96
+
+# 図を初期化
+fig, axes = plt.subplots(
+    nrows=3, ncols=1, 
+    figsize=(9, 12), dpi=100, facecolor='white', 
+    constrained_layout=True
+)
+fig.suptitle('Bayesian inference', fontsize=20)
+axes2 = [ax.twiny() for ax in axes] # 第2軸の設定用
+ax2y = axes2[0].twinx() # 第2軸の設定用
+
+# 初期化処理を定義
+def init():
+    pass
+
+# 作図処理を定義
+def update(i):
+
+    # 前フレームのグラフを初期化
+    [ax.cla() for ax in axes]
+    [ax2.cla() for ax2 in axes2]
+    ax2y.cla()
+    
+    # 値を取得
+    n       = i # データ番号
+    x       = x_n[i-1] if n > 0 else np.nan # 観測値
+    a       = trace_a_lt[i]  # 形状パラメータ
+    b       = trace_b_lt[i]  # 形状パラメータ
+    mu_star = trace_mu_lt[i] # 成功確率パラメータ
+    posterior_dens_vec = anim_posterior_lt[i] # 確率密度
+    predict_prob_vec   = anim_predict_lt[i] # 確率
+    
+    ##### 観測データの作図 -----
+
+    # 生成分布の期待値を計算
+    E_x = mu_truth
+
+    # 観測データの標本平均を計算
+    bar_x = np.mean(x_n[:n])
+    
+    # 観測データを集計
+    obs_freq_vec    = np.array([np.sum(x_n[:n] == x) for x in x_vec]) # 度数
+    obs_relfreq_vec = obs_freq_vec / n                                # 相対度数
+
+    # 生成分布のラベルを作成
+    model_param_lbl  = f'$N = {n}, '
+    model_param_lbl += f'\\mu_{{truth}} = {mu_truth:.2f}, '
+    model_param_lbl += f'E[x] = \\mu_{{truth}} = {E_x:.2f}, '
+    model_param_lbl += f'\\bar{{x}} = {bar_x:.5f}$'
+
+    # 観測データを描画
+    ax = axes[0]
+    ax.axvline(
+        x=mu_truth, 
+        color='red', linewidth=1.0, linestyle='--', 
+        zorder=10
+    ) # 真のパラメータ
+    ax.axvline(
+        x=bar_x, 
+        color='hotpink', linewidth=1.0, linestyle='--', 
+        zorder=11
+    ) # 標本平均
+    ax.bar(
+        x=x_vec, height=model_prob_vec, 
+        facecolor='none', edgecolor='red', linewidth=1.0, linestyle='--', 
+        label='true model', zorder=12
+    ) # 真の分布
+    ax.bar(
+        x=x_vec, height=obs_relfreq_vec, 
+        color='hotpink', alpha=0.5, 
+        label='observation data', zorder=13
+    ) # 観測データ
+    ax.scatter(
+        x=x, y=0.0, 
+        c='hotpink', s=100, 
+        clip_on=False, zorder=14
+    ) # 観測データ
+    ax.text(
+        x=loc_x*loc_margin, y=prob_max*loc_margin, 
+        s=model_param_lbl, ha='left', va='top', 
+        bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5), 
+        size = 10, 
+        zorder=100
+    ) # パラメータラベル
+    ax.set_xticks(ticks=x_vec)
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('probability')
+    ax.set_title('Poisson distribution', loc='left')
+    ax.legend(loc='upper right', prop={'size': 8})
+    ax.grid(zorder=0)
+    ax.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
+    ax.set_ylim(ymin=0.0, ymax=prob_max) # (目盛の共通化用)
+
+    # 第2軸を描画
+    ax2x = axes2[0]
+    ax2x.set_xticks(
+        ticks =[E_x, bar_x+1e-10], 
+        labels=['$E[x]$', '$\\bar{x}$']
+    ) # パラメータラベル
+    ax2x.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
+    
+    freq_max  = prob_max * n if n > 0 else 1.0
+    prob_vals = ax.get_yticks() # 確率軸目盛を取得
+    freq_vals = prob_vals * n   # 度数軸目盛に変換
+
+    ax2y.set_yticks(
+        ticks =freq_vals, 
+        labels=[f'{y:.1f}' for y in freq_vals]
+    ) # 度数軸目盛
+    ax2y.set_ylabel('frequency')
+    ax2y.yaxis.set_label_position(position='right') # (ラベルの表示位置が初期化される対策)
+    ax2y.set_ylim(ymin=0.0, ymax=freq_max) # (目盛の共通化用)
+
+    ##### 事後分布の作図 -----
+    
+    # 事後分布の期待値を計算
+    E_mu = a / (a + b)
+
+    # 事後分布のラベルを作成
+    posterior_param_lbl  = f'$\hat{{a}} = {a:.1f}, \hat{{b}} = {b:.1f}, '
+    posterior_param_lbl += f'E[\\mu] = \\frac{{\hat{{a}}}}{{\hat{{a}} + \hat{{b}}}} = {E_mu:.5f}$'
+
+    # 事後分布を描画
+    ax = axes[1]
+    ax.axvline(
+        x=mu_truth, 
+        color='red', linewidth=1.0, linestyle='--', 
+        label='true parameter', zorder=10
+    ) # 真のパラメータ
+    ax.axvline(
+        x=E_mu, 
+        color='purple', linewidth=1.0, linestyle='--', 
+        zorder=11
+    ) # 期待値
+    ax.plot(
+        mu_vec, posterior_dens_vec, 
+        color='purple', linewidth=1.0, 
+        label='posterior distribution', zorder=12
+    ) # 事後分布
+    ax.scatter(
+        x=x, y=0.0, 
+        c='hotpink', s=100, 
+        clip_on=False, zorder=13
+    ) # 観測データ
+    ax.text(
+        x=loc_x*loc_margin, y=dens_max*loc_margin, 
+        s=posterior_param_lbl, ha='left', va='top', 
+        bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5), 
+        size = 10, 
+        zorder=100
+    ) # パラメータラベル
+    ax.set_xlabel('$\mu$')
+    ax.set_ylabel('density')
+    ax.set_title('Gamma distribution', loc='left')
+    ax.legend(loc='upper right', prop={'size': 8})
+    ax.grid(zorder=0)
+    ax.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
+    ax.set_ylim(ymin=0.0, ymax=dens_max) # 描画範囲を固定
+    
+    # 第2軸を描画
+    ax2 = axes2[1]
+    ax2.set_xticks(
+        ticks =[mu_truth, E_mu+1e-10], 
+        labels=['$\\mu_{{truth}}$', '$E[\\mu]$']
+    ) # パラメータラベル
+    ax2.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
+
+    ##### 予測分布の作図 -----
+  
+    # 予測分布の期待値を計算
+    E_x = mu_star
+    
+    # 予測分布のラベルを作成
+    predict_param_lbl  = f'$\hat{{\\mu}}_{{*}} = {mu_star:.5f}, '
+    predict_param_lbl += f'E[x] = \hat{{\\mu}}_{{*}} = {E_x:.5f}$'
+
+    # 予測分布を描画
+    ax = axes[2]
+    ax.axvline(
+        x=mu_truth, 
+        color='red', linewidth=1.0, linestyle='--', 
+        zorder=10
+    ) # 真のパラメータ
+    ax.axvline(
+        x=E_x, 
+        color='purple', linewidth=1.0, linestyle='--', 
+        zorder=11
+    ) # 期待値
+    ax.bar(
+        x=x_vec, height=model_prob_vec, 
+        facecolor='none', edgecolor='red', linewidth=1.0, linestyle='--', 
+        label='true model', zorder=12
+    ) # 真の分布
+    ax.bar(
+        x=x_vec, height=predict_prob_vec, 
+        color='purple', alpha=0.5, 
+        label='predict distribution', zorder=13
+    ) # 予測分布
+    ax.scatter(
+        x=x, y=0.0, 
+        c='hotpink', s=100, 
+        clip_on=False, zorder=14
+    ) # 観測データ
+    ax.text(
+        x=loc_x*loc_margin, y=prob_max*loc_margin, 
+        s=predict_param_lbl, ha='left', va='top', 
+        bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5), 
+        size = 10, 
+        zorder=100
+    ) # パラメータラベル
+    ax.set_xticks(ticks=x_vec)
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('probability')
+    ax.set_title('Negative Binomial distribution', loc='left') # パラメータラベル
+    ax.legend(loc='upper right', prop={'size': 8})
+    ax.grid(zorder=0)
+    ax.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
+    ax.set_ylim(ymin=0.0, ymax=prob_max) # 描画範囲を固定
+
+    # 第2軸を描画
+    ax2 = axes2[2]
+    ax2.set_xticks(
+        ticks =[mu_truth, E_x+1e-10], 
+        labels=['$\\mu_{{truth}}$', '$E[x]$']
+    ) # パラメータラベル
+    ax2.set_xlim(xmin=x_min-0.5, xmax=x_max+0.5) # (目盛の共通化用)
+
+# 動画を作成
+anim = FuncAnimation(
+    fig=fig, func=update, init_func=init, 
+    frames=N+1, interval=100
+)
+
+# 動画を書出
+anim.save(
+    filename='../../figure/bernoulli_model/parameter_updates/observation.mp4', 
+    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+)
+
 
 #%%
 
-print('end')
 
