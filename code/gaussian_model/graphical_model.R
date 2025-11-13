@@ -100,7 +100,7 @@ DiagrammeRsvg::export_svg(gv = graph) |> # svgファイルに変換
 # 1次元ガウスモデルのグラフィカルモデルを作図
 graph <- DiagrammeR::grViz("
   digraph dot{
-    label    = 'Gaussian mode \n unknown mean and precision'
+    label    = 'Gaussian model \n unknown mean and precision'
     labelloc = t
     fontsize = 20
     
@@ -130,7 +130,7 @@ graph <- DiagrammeR::grViz("
     mu -> lambda [dir = back]; # (ノード位置の共通化用の小細工)
   }
 ")
-graph
+
 # グラフを書出
 DiagrammeRsvg::export_svg(gv = graph) |> # svgファイルに変換
   charToRaw() |> 
