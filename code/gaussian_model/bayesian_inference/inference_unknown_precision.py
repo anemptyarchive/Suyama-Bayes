@@ -7,173 +7,245 @@
 # 推論アルゴリズムの実装
 
 
-#%%
+# %%
 
-# 3.3.2項で利用するライブラリ
+# ライブラリの読込 ---------------------------------------------------------------
+
+# ライブラリを読込
 import numpy as np
-from scipy.special import gammaln # 対数ガンマ関数
-from scipy.stats import norm, gamma, t # 1次元ガウス分布, ガンマ分布, 1次元スチューデントのt分布
+from scipy.stats import norm, gamma, t
 import matplotlib.pyplot as plt
 
-#%%
 
-## 尤度(ガウス分布)の設定
+# %%
 
-# (既知の)平均パラメータを指定
-mu = 25
+# ベイズ推論の実装 ---------------------------------------------------------------
 
-# 真の精度パラメータを指定
-lambda_truth = 0.01
-print(np.sqrt(1 / lambda_truth)) # 標準偏差
+### 生成分布(ガウス分布)の設定 -----
 
+#### パラメータの設定 -----
 
-# 作図用のxの値を設定
-x_line = np.linspace(
-    mu - 4.0 * np.sqrt(1.0 / lambda_truth), 
-    mu + 4.0 * np.sqrt(1.0 / lambda_truth), 
-    num=1000
-)
+# 既知のパラメータを指定
+mu = 5.0
+
+# 真のパラメータを指定
+lambda_truth = 0.25
+print(1.0/np.sqrt(lambda_truth))
 
 
-# 尤度の確率密度を計算:式(2.64)
-ln_C_N = - 0.5 * (np.log(2.0 * np.pi) - np.log(lambda_truth)) # 正規化項(対数)
-model_dens = np.exp(ln_C_N - 0.5 * lambda_truth * (x_line - mu)**2)
-#model_dens = norm.pdf(x=x_line, loc=mu, scale=np.sqrt(1.0 / lambda_truth))
+# %%
 
-#%%
+#### 変数の設定 -----
 
-# 尤度を作図
-plt.figure(figsize=(12, 9))
-plt.plot(x_line, model_dens, label='true model') # 真の分布
-plt.xlabel('x')
-plt.ylabel('density')
-plt.suptitle('Gaussian Distribution', fontsize=20)
-plt.title('$\mu=' + str(mu) + ', \lambda=' + str(lambda_truth) + '$', loc='left')
-plt.legend() # 凡例
-plt.grid() # グリッド線
-plt.show()
+# x軸の範囲を設定
+u = 5.0
+x_size  = 1.0/np.sqrt(lambda_truth) # 基準値を指定
+x_size *= 4.0 # 倍率を指定
+#x_size  = max(x_size, (x_n-mu_truth).max()) # サンプルと比較
+x_size  = np.ceil(x_size /u)*u # u単位で切り上げ
+x_min   = mu - x_size
+x_max   = mu + x_size
+print('x size:', x_min, x_max)
 
-#%%
+# x軸の値を作成
+x_vec = np.linspace(start=x_min, stop=x_max, num=1001)
 
-## 観測データの生成
 
-# (観測)データ数を指定
-N = 50
+# %%
 
-# ガウス分布に従うデータを生成
-x_n = np.random.normal(loc=mu, scale=np.sqrt(1.0 / lambda_truth), size=N)
-print(x_n[:5])
+#### 分布の計算 -----
 
-#%%
+# 生成分布の確率密度を計算
+model_dens_vec = norm.pdf(x=x_vec, loc=mu, scale=1.0/np.sqrt(lambda_truth))
 
-# 観測データのヒストグラムを作成
-plt.figure(figsize=(12, 9))
-plt.plot(x_line, model_dens, color='red', linestyle='--', label='true model') # 真の分布
-plt.hist(x=x_n, density=True, bins=50, label='data') # 観測データ:(相対度数)
-#plt.hist(x=x_n, bins=50, label='data') # 観測データ:(度数)
-plt.xlabel('x')
-plt.ylabel('count')
-plt.suptitle('Gaussian Distribution', fontsize=20)
-plt.title('$N=' + str(N) + ', \mu=' + str(mu) + ', \lambda=' + str(lambda_truth) + '$', loc='left')
-plt.legend() # 凡例
-plt.grid() # グリッド線
-plt.show()
 
-#%%
+# %%
 
-## 事前分布(ガンマ分布)の設定
+### 事前分布(ガンマ分布)の設定 -----
 
-# lambdaの事前分布のパラメータを指定
+#### パラメータの設定 -----
+
+# 事前分布のパラメータを指定
 a = 1.0
 b = 1.0
 
-# 作図用のlambdaの値を設定
-lambda_line = np.linspace(0.0, 4.0 * lambda_truth, num=1000)
+
+# %%
+
+#### 変数の設定 -----
+
+# λ軸の範囲を設定
+lambda_min = 0.0
+#lambda_max = 1.0
+u = 0.5
+lambda_max = lambda_truth # 基準値を指定
+lambda_max *= 3.0 # 倍率を指定
+lambda_max = np.ceil(lambda_max /u)*u # u単位で切り上げ
+print('λ size:', lambda_min, lambda_max)
+
+# λ軸の値を作成
+lambda_vec = np.linspace(start=lambda_min, stop=lambda_max, num=1001)
 
 
-# lambdaの事前分布の確率密度を計算:式(2.56)
-ln_C_Gam = a * np.log(b) - gammaln(a) # 正規化項(対数)
-prior_dens = np.exp(ln_C_Gam + (a - 1.0) * np.log(lambda_line) - b * lambda_line)
-#prior_dens = gamma.pdf(x=lambda_line, a=a, scale=1.0 / b)
+# %%
 
-#%%
+#### 分布の計算 -----
 
-# lambdaの事前分布を作図
-plt.figure(figsize=(12, 9))
-plt.plot(lambda_line, prior_dens, color='purple', label='prior') # lambdaの事前分布
-plt.vlines(x=lambda_truth, ymin=0.0, ymax=np.nanmax(prior_dens) * 2, 
-           color='red', linestyle='--', label='ture val') # 真の値
-plt.xlabel('$\lambda$')
-plt.ylabel('density')
-plt.suptitle('Gamma Distribution', fontsize=20)
-plt.title('$a=' + str(a) + ', b=' + str(b) + '$', loc='left')
-plt.legend() # 凡例
-plt.grid() # グリッド線
-plt.show()
+# 事前分布の確率密度を計算
+prior_dens_vec = gamma.pdf(x=lambda_vec, a=a, scale=1.0/b)
 
-#%%
 
-## 事後分布(ガンマ分布)の計算
+# %%
+
+### 観測データの生成 -----
+
+#### データの生成 -----
+
+# データ数を指定
+N = 50
+
+# 観測データを生成
+x_n = np.random.normal(loc=mu, scale=1.0/np.sqrt(lambda_truth), size=N)
+
+
+# %%
+
+### データの集計 -----
+
+# 階級数を指定
+bin_num = 40
+
+# 階級幅を計算
+bin_size = (x_max - x_min) / bin_num
+
+# 境界値の範囲を設定
+bin_min = x_min - 0.5*bin_size
+bin_max = x_max + 0.5*bin_size
+
+# 密度を集計
+obs_dens_vec, bin_vec = np.histogram(a=x_n, bins=bin_num+1, range=(bin_min, bin_max), density=True)
+
+# 階級値を作成
+center_vec = bin_vec[:-1] + 0.5*bin_size
+
+
+# %%
+
+### 事後分布(ガンマ分布)の計算 -----
+
+#### パラメータの計算 -----
 
 # lambdaの事後分布のパラメータを計算:式(3.69)
 a_hat = 0.5 * N + a
 b_hat = 0.5 * np.sum((x_n - mu)**2) + b
 
 
-# lambdaの事後分布の確率密度を計算:式(2.56)
-ln_C_Gam = a_hat * np.log(b_hat) - gammaln(a_hat) # 正規化項(対数)
-posterior_dens = np.exp(ln_C_Gam + (a_hat - 1.0) * np.log(lambda_line) - b_hat * lambda_line)
-#posterior_dens = gamma.pdf(x=lambda_line, a=a_hat, scale=1.0 / b_hat)
+# %%
 
-#%%
+#### 分布の計算 -----
 
-# lambdaの事後分布を作図
-plt.figure(figsize=(12, 9))
-plt.plot(lambda_line, posterior_dens, color='purple', label='posterior') # lambdaの事後分布
-plt.vlines(x=lambda_truth, ymin=0.0, ymax=np.nanmax(posterior_dens), 
-           color='red', linestyle='--', label='ture val') # 真の値
-plt.xlabel('$\lambda$')
-plt.ylabel('density')
-plt.suptitle('Gamma Distribution', fontsize=20)
-plt.title('$N=' + str(N) + ', a=' + str(a_hat) + ', b=' + str(np.round(b_hat, 1)) + '$', loc='left')
-plt.legend() # 凡例
-plt.grid() # グリッド線
+# 事後分布の確率密度を計算
+posterior_dens_vec = gamma.pdf(x=lambda_vec, a=a_hat, scale=1.0/b_hat)
+
+
+# %%
+
+#### 分布の作図 -----
+
+# 事後分布のラベルを作成
+posterior_param_lbl  = f'$N = {N}, '
+posterior_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.3g}, '
+posterior_param_lbl += f'a = {a:.3g}, b = {b:.3g}, '
+posterior_param_lbl += f'\\hat{{a}} = {a_hat:.3g}, \\hat{{b}} = {b_hat:.3g}$'
+
+# 事後分布を作図
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
+fig.suptitle('Gamma distribution', fontsize=20)
+
+ax.axvline(
+    x=lambda_truth, 
+    color='red', linewidth=1.0, linestyle='--', 
+    label='true parameter', zorder=10
+) # 真のパラメータ
+ax.plot(
+    lambda_vec, prior_dens_vec, 
+    color='purple', linewidth=1.0, linestyle=':', 
+    label='prior distribution', zorder=11
+) # 事前分布
+ax.plot(
+    lambda_vec, posterior_dens_vec, 
+    color='purple', linewidth=1.0, 
+    label='posterior distribution', zorder=12
+) # 事後分布
+ax.set_xlabel('$\lambda$')
+ax.set_ylabel('density')
+ax.set_title(posterior_param_lbl, loc='left') # パラメータラベル
+ax.legend(prop={'size': 8})
+ax.grid(zorder=0)
+ax.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
+
+ax2 = ax.twiny() # 第2軸の設定用
+ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{truth}$']) # パラメータラベル
+ax2.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
+
 plt.show()
 
-#%%
 
-## 予測分布(スチューデントのt分布)の計算
+# %%
+
+### 予測分布(スチューデントのt分布)の計算 -----
+
+#### パラメータの計算 -----
 
 # 予測分布のパラメータを計算:式(3.79')
-mu_s = mu
+mu_s         = mu
 lambda_s_hat = a_hat / b_hat
-nu_s_hat = 2 * a_hat
-#lambda_s_hat = (N + 2 * a) / (np.sum((x_n - mu)**2) + 2 * b)
-#nu_s_hat = N + 2 * a
+nu_s_hat     = 2.0 * a_hat
+#lambda_s_hat  = N + 2.0 * a
+#lambda_s_hat /= np.sum((x_n - mu)**2) + 2.0 * b
+#nu_s_hat      = N + 2.0 * a
 
 
-# 予測分布の確率密度を計算:式(3.76)
-ln_C_St = gammaln(0.5 * (nu_s_hat + 1.0)) - gammaln(0.5 * nu_s_hat) # 正規化項(対数)
-ln_term1 = 0.5 * np.log(lambda_s_hat / np.pi / nu_s_hat)
-ln_term2 = - 0.5 * (nu_s_hat + 1.0) * np.log(1.0 + lambda_s_hat / nu_s_hat * (x_line - mu_s)**2)
-predict_dens = np.exp(ln_C_St + ln_term1 + ln_term2)
-#predict_dens = t.pdf(x=x_line, df=nu_s_hat, loc=mu_s, scale=np.sqrt(1 / lambda_s_hat))
+# %%
 
-#%%
+#### 分布の計算 -----
+
+# 予測分布の確率密度を計算
+predict_dens_vec = t.pdf(x=x_vec, df=nu_s_hat, loc=mu_s, scale=1.0/np.sqrt(lambda_s_hat))
+
+
+# %%
+
+#### 分布の作図 -----
+
+# 予測分布のラベルを作成
+predict_param_lbl  = f'$N = {N}, '
+predict_param_lbl += f'\\mu = {mu:.3g}, \\lambda_{{truth}} = {lambda_truth:.3g}, '
+predict_param_lbl += f'\\mu_s = {mu_s:.3g}, \\hat{{\\lambda}}_s = {lambda_s_hat:.3g}, \\hat{{\\nu}}_s = {nu_s_hat:.3g}$'
 
 # 予測分布を作図
-plt.figure(figsize=(12, 9))
-plt.plot(x_line, predict_dens, color='purple', label='predict') # 予測分布
-plt.plot(x_line, model_dens, color='red', linestyle='--', label='true model') # 真の分布
-plt.xlabel('x')
-plt.ylabel('density')
-plt.suptitle("Student's t Distribution", fontsize=20)
-plt.title('$N=' + str(N) + 
-          ', \mu_s=' + str(mu_s) + 
-          ', \hat{\lambda}_s=' + str(np.round(lambda_s_hat, 5)) + 
-          ', \hat{\\nu}_s=' + str(nu_s_hat) + '$', loc='left')
-plt.legend() # 凡例
-plt.grid() # グリッド線
+fig, ax = plt.subplots(figsize=(9, 6), dpi=100, facecolor='white', constrained_layout=True)
+fig.suptitle("Student's t Distribution", fontsize=20)
+
+ax.plot(
+    x_vec, model_dens_vec, 
+    color='red', linewidth=1.0, linestyle='--', 
+    label='true model', zorder=10
+) # 真の分布
+ax.plot(
+    x_vec, predict_dens_vec, 
+    color='purple', linewidth=1.0, 
+    label='predict distribution', zorder=11
+) # 予測分布
+ax.set_xlabel('$x$')
+ax.set_ylabel('density')
+ax.set_title(predict_param_lbl, loc='left') # パラメータラベル
+ax.legend(prop={'size': 8})
+ax.grid(zorder=0)
+
 plt.show()
 
-#%%
+
+# %%
+
+
