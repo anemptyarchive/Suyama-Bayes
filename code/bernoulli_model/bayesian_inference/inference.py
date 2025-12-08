@@ -6,7 +6,7 @@
 # 推論アルゴリズムの実装
 
 
-#%%
+# %%
 
 # ライブラリの読込 ---------------------------------------------------------------
 
@@ -16,7 +16,7 @@ from scipy.stats import beta
 import matplotlib.pyplot as plt
 
 
-#%%
+# %%
 
 # ベイズ推論の実装 -------------------------------------------------------------
 
@@ -33,8 +33,8 @@ mu_truth = 0.25
 #### 変数の設定 -----
 
 # x軸の範囲を設定
-x_min = 0
-x_max = 1
+x_min = 0 # (固定)
+x_max = 1 # (固定)
 
 # x軸の値を作成
 x_vec = np.arange(start=x_min, stop=x_max+1, step=1)
@@ -59,13 +59,13 @@ a = 1.0
 b = 1.0
 
 
-#%%
+# %%
 
 #### 変数の設定 -----
 
 # μ軸の範囲を設定
-mu_min = 0
-mu_max = 1
+mu_min = 0 # (固定)
+mu_max = 1 # (固定)
 
 # μ軸の値を作成
 mu_vec = np.linspace(start=mu_min, stop=mu_max, num=1001)
@@ -73,11 +73,13 @@ mu_vec = np.linspace(start=mu_min, stop=mu_max, num=1001)
 
 # %%
 
+#### 分布の計算 -----
+
 # 事前分布の確率密度を計算
 prior_dens_vec = beta.pdf(x=mu_vec, a=a, b=b)
 
 
-#%%
+# %%
 
 ### 観測データの生成 -----
 
@@ -90,18 +92,15 @@ N = 50
 x_n = np.random.binomial(n=1, p=mu_truth, size=N)
 
 
-#%%
+# %%
 
 ### データの集計 -----
 
-# 度数を集計
-obs_freq_vec = np.array([N-np.sum(x_n), np.sum(x_n)])
-
-# 相対度数を計算
-obs_relfreq_vec = obs_freq_vec / N
+# 相対度数を集計
+obs_relfreq_vec = np.array([N-np.sum(x_n), np.sum(x_n)]) / N
 
 
-#%%
+# %%
 
 ### 事後分布(ベータ分布)の計算 -----
 
@@ -126,9 +125,9 @@ posterior_dens_vec = beta.pdf(x=mu_vec, a=a_hat, b=b_hat)
 
 # 事後分布のラベルを作成
 posterior_param_lbl  = f'$N = {N}, '
-posterior_param_lbl += f'\\mu_{{truth}} = {mu_truth:.2f}, '
-posterior_param_lbl += f'a = {a:.1f}, b = {b:.1f}, '
-posterior_param_lbl += f'\hat{{a}} = {a_hat:.1f}, \hat{{b}} = {b_hat:.1f}$'
+posterior_param_lbl += f'\\mu_{{truth}} = {mu_truth:.3g}, '
+posterior_param_lbl += f'a = {a:.3g}, b = {b:.3g}, '
+posterior_param_lbl += f'\\hat{{a}} = {a_hat:.3g}, \\hat{{b}} = {b_hat:.3g}$'
 
 # 事後分布を作図
 fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
@@ -163,26 +162,24 @@ ax2.set_xlim(xmin=mu_min, xmax=mu_max) # (目盛の共通化用)
 plt.show()
 
 
-#%%
+# %%
 
 ### 予測分布(ベルヌーイ分布)の計算 -----
 
 #### パラメータの計算 -----
 
 # 予測分布のパラメータを計算:式(3.19')
-mu_star_hat = a_hat / (a_hat + b_hat)
-#mu_star_hat = (np.sum(x_n) + a) / (N + a + b)
+mu_s_hat = a_hat / (a_hat + b_hat)
+#mu_s_hat = (np.sum(x_n) + a) / (N + a + b)
 
 
 # %%
 
 #### 分布の計算 -----
 
-# 予測分布の確率を計算:式(2.16)
-predict_prob_vec = np.array([1.0-mu_star_hat, mu_star_hat])
+# 予測分布の確率を計算
+predict_prob_vec = np.array([1.0-mu_s_hat, mu_s_hat])
 
-
-# %%
 
 # %%
 
@@ -190,8 +187,8 @@ predict_prob_vec = np.array([1.0-mu_star_hat, mu_star_hat])
 
 # 予測分布のラベルを作成
 predict_param_lbl  = f'$N = {N}, '
-predict_param_lbl += f'\\mu_{{truth}} = {mu_truth:.2f}, '
-predict_param_lbl += f'\hat{{\\mu}}_{{*}} = {mu_star_hat:.5f}$'
+predict_param_lbl += f'\\mu_{{truth}} = {mu_truth:.3g}, '
+predict_param_lbl += f'\\hat{{\\mu}}_{{*}} = {mu_s_hat:.3g}$'
 
 # 予測分布を作図
 fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
@@ -207,7 +204,7 @@ ax.bar(
     color='purple', alpha=0.5, 
     label='predict', zorder=11
 ) # 予測分布
-ax.set_xticks(ticks=x_vec)
+ax.set_xticks(ticks=x_vec) # x軸目盛
 ax.set_xlabel('$x$')
 ax.set_ylabel('probability')
 ax.set_title(predict_param_lbl, loc='left') # パラメータラベル

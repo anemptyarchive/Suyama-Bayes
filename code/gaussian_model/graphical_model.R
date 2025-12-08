@@ -27,8 +27,8 @@ graph <- DiagrammeR::grViz("
     node  [shape = circle, fixedsize = ture, height = 0.6, fontname = 'Times-Italic']
     edge  []
     
-    m [label = 'm']
-    l [label = '&lambda;@_{&mu;}']
+    m         [label = 'm']
+    lambda_mu [label = '&lambda;@_{&mu;}']
     
     mu     [label = '&mu;']
     lambda [label = '&lambda;', style = filled, filledcolor = gray]
@@ -42,7 +42,7 @@ graph <- DiagrammeR::grViz("
     
     {rank = same; mu; lambda}
     
-    {m, l} -> mu -> x;
+    {m, lambda_mu} -> mu -> x;
     lambda -> x;
   }
 ")
@@ -67,8 +67,8 @@ graph <- DiagrammeR::grViz("
     node  [shape = circle, fixedsize = ture, height = 0.6, fontname = 'Times-Italic']
     edge  []
     
-    a    [label = 'a']
-    b    [label = 'b']
+    a [label = 'a']
+    b [label = 'b']
     
     mu     [label = '&mu;', style = filled, filledcolor = gray]
     lambda [label = '&lambda;']
@@ -84,7 +84,7 @@ graph <- DiagrammeR::grViz("
     
     mu -> x;
     {a, b} -> lambda -> x;
-    mu -> lambda [arrowhead = none, penwidth = 0]; # (ノード位置の共通化用の小細工)
+    mu -> lambda [arrowhead = none, penwidth = 0]; ## (エッジ設定は、ノード位置の共通化用の小細工)
   }
 ")
 
@@ -127,7 +127,7 @@ graph <- DiagrammeR::grViz("
     
     {m, beta} -> mu -> x;
     {a, b} -> lambda -> x;
-    mu -> lambda [dir = back]; # (ノード位置の共通化用の小細工)
+    mu -> lambda [dir = back]; ## (エッジ設定は、ノード位置の共通化用の小細工)
   }
 ")
 

@@ -1,12 +1,12 @@
 
 # ポアソンモデル ----------------------------------------------------------------
 
-# chapter 3.2.3 
+# chapter 3.2.3
 # ベイズ推論
 # 推論アルゴリズムの実装
 
 
-#%%
+# %%
 
 # ライブラリの読込 ---------------------------------------------------------------
 
@@ -16,7 +16,7 @@ from scipy.stats import poisson, gamma, nbinom
 import matplotlib.pyplot as plt
 
 
-#%%
+# %%
 
 # ベイズ推論の実装 ---------------------------------------------------------------
 
@@ -53,7 +53,7 @@ x_vec = np.arange(start=x_min, stop=x_max+1, step=1)
 model_prob_vec = poisson.pmf(k=x_vec, mu=lambda_truth)
 
 
-#%%
+# %%
 
 ### 事前分布(ガンマ分布)の設定 -----
 
@@ -100,18 +100,15 @@ N = 50
 x_n = np.random.poisson(lam=lambda_truth, size=N)
 
 
-#%%
+# %%
 
 ### データの集計 -----
 
-# 度数を集計
-obs_freq_vec = np.array([np.sum(x_n == x) for x in x_vec])
-
-# 相対度数を計算
-obs_relfreq_vec = obs_freq_vec / N
+# 相対度数を集計
+obs_relfreq_vec = np.array([np.sum(x_n == x) for x in x_vec]) / N
 
 
-#%%
+# %%
 
 ### 事後分布(ガンマ分布)の計算 -----
 
@@ -136,9 +133,9 @@ posterior_dens_vec = gamma.pdf(x=lambda_vec, a=a_hat, scale=1.0/b_hat)
 
 # 事後分布のラベルを作成
 posterior_param_lbl  = f'$N = {N}, '
-posterior_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
-posterior_param_lbl += f'a = {a:.1f}, b = {b:.1f}, '
-posterior_param_lbl += f'\hat{{a}} = {a_hat:.1f}, \hat{{b}} = {b_hat:.1f}$'
+posterior_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.3g}, '
+posterior_param_lbl += f'a = {a:.3g}, b = {b:.3g}, '
+posterior_param_lbl += f'\\hat{{a}} = {a_hat:.3g}, \\hat{{b}} = {b_hat:.3g}$'
 
 # 事後分布を作図
 fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
@@ -173,7 +170,7 @@ ax2.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
 plt.show()
 
 
-#%%
+# %%
 
 ### 予測分布(負の二項分布)の計算 -----
 
@@ -203,8 +200,8 @@ predict_prob_vec = nbinom.pmf(k=x_vec, n=r_hat, p=p_hat)
 
 # 予測分布のラベルを作成
 predict_param_lbl  = f'$N = {N}, '
-predict_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.2f}, '
-predict_param_lbl += f'\hat{{r}} = {r_hat:.1f}, \hat{{p}} = {p_hat:.5f}$'
+predict_param_lbl += f'\\lambda_{{truth}} = {lambda_truth:.3g}, '
+predict_param_lbl += f'\\hat{{r}} = {r_hat:.3g}, \\hat{{p}} = {p_hat:.3g}$'
 
 # 予測分布を作図
 fig, ax = plt.subplots(figsize=(8, 6), dpi=100, facecolor='white', constrained_layout=True)
@@ -220,7 +217,7 @@ ax.bar(
     color='purple', alpha=0.5, 
     label='predict', zorder=11
 ) # 予測分布
-ax.set_xticks(ticks=x_vec)
+ax.set_xticks(ticks=x_vec) # x軸目盛
 ax.set_xlabel('$x$')
 ax.set_ylabel('probability')
 ax.set_title(predict_param_lbl, loc='left') # パラメータラベル
