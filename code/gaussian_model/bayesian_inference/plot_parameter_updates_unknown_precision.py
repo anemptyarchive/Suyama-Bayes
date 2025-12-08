@@ -31,7 +31,7 @@ mu = 5.0
 lambda_truth = 0.25
 
 # 標準偏差パラメータに変換
-sigma_truth = 1.0/np.sqrt(lambda_truth)
+sigma_truth = 1.0/np.sqrt(lambda_truth) # (処理の効率化用)
 print(sigma_truth)
 
 
@@ -156,10 +156,10 @@ trace_b_lt = np.hstack(
 # 予測分布のパラメータを計算:式(3.79)
 trace_mu_s_lt = np.tile(mu, reps=N+1).tolist()
 trace_lambda_s_lt = np.hstack(
-    [a/b, (np.arange(1, N+1) + 2.0*a) / (np.cumsum((x_n - mu)**2) + 2.0*b)]
+    [a/b, (np.arange(1, N+1) + 2.0 * a) / (np.cumsum((x_n - mu)**2) + 2.0 * b)]
 ).tolist()
 trace_nu_s_lt = (
-    np.arange(N+1) + 2.0*a
+    np.arange(N+1) + 2.0 * a
 ).tolist()
 
 
@@ -247,8 +247,8 @@ def update(i):
     ax.set_title(posterior_param_lbl, loc='left') # パラメータラベル
     ax.legend(loc='upper right', prop={'size': 8})
     ax.grid(zorder=0)
-    ax.set_xlim(xmin=lambda_min, xmax=lambda_max) # 描画範囲を固定
-    ax.set_ylim(ymin=0.0, ymax=dens_max) # 描画範囲を固定
+    ax.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
+    ax.set_ylim(ymin=0.0, ymax=dens_max)          # 描画範囲を固定
     
     # 第2軸を描画
     ax2.set_xticks(ticks=[lambda_truth], labels=['$\lambda_{truth}$']) # パラメータラベル
@@ -330,7 +330,7 @@ def update(i):
     ax.set_title(predict_param_lbl, loc='left') # パラメータラベル
     ax.legend(loc='upper right', prop={'size': 8})
     ax.grid(zorder=0)
-    ax.set_xlim(xmin=x_min, xmax=x_max) # 描画範囲を固定
+    ax.set_xlim(xmin=x_min, xmax=x_max)  # 描画範囲を固定
     ax.set_ylim(ymin=0.0, ymax=dens_max) # 描画範囲を固定
 
 # 動画を作成
@@ -382,8 +382,8 @@ fig, axes = plt.subplots(
     constrained_layout=True
 )
 fig.suptitle('Bayesian inference', fontsize=20)
-axes2 = [ax.twiny() for ax in [axes[1, 0], axes[1, 1], axes[2, 0]]] # 第2軸の設定用
-ax2y  = axes[1, 0].twinx() # 第2軸の設定用
+axes2x = [ax.twiny() for ax in [axes[1, 0], axes[1, 1], axes[2, 0]]] # 第2軸の設定用
+axes2y = [ax.twinx() for ax in [axes[0, 0], axes[1, 0]]]             # 第2軸の設定用
 
 # 初期化処理を定義
 def init():
@@ -394,8 +394,8 @@ def update(i):
 
     # 前フレームのグラフを初期化
     [ax.cla() for ax in axes.flatten()]
-    [ax2.cla() for ax2 in axes2]
-    ax2y.cla()
+    [ax.cla() for ax in axes2x]
+    [ax.cla() for ax in axes2y]
     
     # 値を取得
     n = i # データ番号
@@ -434,6 +434,11 @@ def update(i):
     ax.grid(zorder=0)
     ax.set_xlim(xmin=sigma_min, xmax=sigma_max) # (目盛の共通化用)
     ax.set_ylim(ymin=sigma_min, ymax=sigma_max) # (目盛の共通化用)
+
+    # 第2軸を描画
+    ax2y = axes2y[0]
+    ax2y.set_yticks(ticks=[sigma_truth], labels=['$\\sigma_{truth}$']) # パラメータラベル
+    ax2y.set_ylim(ymin=sigma_min, ymax=sigma_max) # (目盛の共通化用)
 
     ##### 軸変換の作図：(σ to λ) -----
 
@@ -476,7 +481,7 @@ def update(i):
     if n > 0:
         obs_dens_vec, _ = np.histogram(a=x_n[:n], bins=bin_num+1, range=(bin_min, bin_max), density=True)
     else:
-        obs_dens_vec = np.zeros(shape=bin_num+1)
+        obs_dens_vec = np.zeros(shape=bin_num+1) # (警告文の回避用)
 
     # 生成分布のラベルを作成
     model_param_lbl  = f'$N = {n}$\n'
@@ -513,9 +518,14 @@ def update(i):
         label='observation data', zorder=14
     ) # 観測データ
     ax.scatter(
+        x=x_n[:n], y=np.zeros(shape=n), 
+        c='hotpink', alpha=0.33, s=25, 
+        clip_on=False, zorder=15
+    ) # 観測データ
+    ax.scatter(
         x=x, y=0.0, 
         c='hotpink', s=100, 
-        clip_on=False, zorder=15
+        clip_on=False, zorder=16
     ) # 観測データ
 
     ax.text(
@@ -534,7 +544,7 @@ def update(i):
     ax.set_ylim(ymin=0.0, ymax=predict_dens_max) # (目盛の共通化用)
 
     # 第2軸を描画
-    ax2 = axes2[0]
+    ax2 = axes2x[0]
     ax2.set_xticks(
         ticks =[mu+sigma_truth, E_x, bar_x+1e-10], 
         labels=['$\\mu + \\sigma_{truth}$', '$E[x]$', '$\\bar{x}$']
@@ -545,6 +555,7 @@ def update(i):
     dens_vals = ax.get_yticks()        # 確率密度軸目盛を取得
     freq_vals = dens_vals * bin_size*n # 度数軸目盛に変換
 
+    ax2y = axes2y[1]
     ax2y.set_yticks(
         ticks =freq_vals, 
         labels=[f'{y:.1f}' for y in freq_vals]
@@ -557,7 +568,7 @@ def update(i):
 
     # 事後分布の期待値を計算
     E_lambda = a / b
-    E_sigma  = 1.0/np.sqrt(E_lambda)
+    E_sigma  = 1.0/np.sqrt(E_lambda) # (処理の効率化用)
 
     # 事後分布のラベルを作成
     posterior_param_lbl  = f'$\\hat{{a}} = {a:.1f}, \\hat{{b}} = {b:.1f}$\n'
@@ -603,11 +614,11 @@ def update(i):
     ax.set_title('Gamma distribution', loc='left')
     ax.legend(loc='upper right', prop={'size': 8})
     ax.grid(zorder=0)
-    ax.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
+    ax.set_xlim(xmin=lambda_min, xmax=lambda_max)  # (目盛の共通化用)
     ax.set_ylim(ymin=0.0, ymax=posterior_dens_max) # 描画範囲を固定
 
     # 第2軸を描画
-    ax2 = axes2[1]
+    ax2 = axes2x[1]
     ax2.set_xticks(
         ticks =[lambda_truth, E_lambda+1e-10], 
         labels=['$\\lambda_{{truth}}$', '$E[\\lambda]$']
@@ -682,7 +693,7 @@ def update(i):
     ax.set_ylim(ymin=0.0, ymax=predict_dens_max) # (目盛の共通化用)
 
     # 第2軸を描画
-    ax2 = axes2[2]
+    ax2 = axes2x[2]
     ax2.set_xticks(
         ticks =[mu, E_x+1e-10], 
         labels=['$\\mu$', '$E[x]$']

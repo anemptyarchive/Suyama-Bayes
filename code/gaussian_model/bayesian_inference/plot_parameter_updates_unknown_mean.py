@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 
-#%%
+# %%
 
 # ベイズ推論の可視化 -------------------------------------------------------------
 
@@ -29,6 +29,7 @@ mu_truth = 25.0
 
 # 既知のパラメータを指定
 lmd = 0.01
+print(1.0/np.sqrt(lmd))
 
 
 # %%
@@ -36,7 +37,7 @@ lmd = 0.01
 ### 観測データの生成 -----
 
 # シードを設定(ノートとの対応用)
-#np.random.seed(86)
+np.random.seed(86)
 
 # データ数(試行回数)を指定
 N = 100
@@ -64,8 +65,8 @@ x_vec = np.linspace(start=x_min, stop=x_max, num=1001)
 
 
 # μ軸の範囲を設定
-mu_min = x_min
-mu_max = x_max
+mu_min = x_min # (固定)
+mu_max = x_max # (固定)
 print('μ size:', mu_min, mu_max)
 
 # μ軸の値を作成
@@ -102,7 +103,7 @@ for n in range(N):
     lambda_mu_old = lambda_mu
     lambda_mu += lmd
     m         *= lambda_mu_old
-    m         += lmd * x
+    m         += x * lmd
     m         /= lambda_mu
     
     # 予測分布のパラメータを計算:式(3.62)
@@ -123,6 +124,23 @@ for n in range(N):
 
 #### 一括更新の場合 -----
 
+# 事前分布のパラメータを初期化
+m         = 0.0
+lambda_mu = 0.001
+
+# 事後分布のパラメータを計算:式(3.53, 3.54)
+trace_m_lt = np.hstack(
+    [m, (np.cumsum(x_n) * lmd + m * lambda_mu) / (np.arange(1, N+1) * lmd + lambda_mu)]
+).tolist()
+trace_lambda_mu_lt = (
+    np.arange(N+1) * lmd + lambda_mu
+).tolist()
+
+# 予測分布のパラメータを計算:式(3.62)
+trace_mu_s_lt = trace_m_lt.copy()
+trace_lambda_s_lt = (
+    1.0 / (1.0/lmd + 1.0/np.array(trace_lambda_mu_lt))
+).tolist()
 
 
 # %%
@@ -209,8 +227,8 @@ def update(i):
     ax.set_title(posterior_param_lbl, loc='left') # パラメータラベル
     ax.legend(loc='upper right', prop={'size': 8})
     ax.grid(zorder=0)
-    ax.set_xlim(xmin=mu_min, xmax=mu_max) # 描画範囲を固定
-    ax.set_ylim(ymin=0.0, ymax=dens_max) # 描画範囲を固定
+    ax.set_xlim(xmin=mu_min, xmax=mu_max) # (目盛の共通化用)
+    ax.set_ylim(ymin=0.0, ymax=dens_max)  # 描画範囲を固定
     
     # 第2軸を描画
     ax2.set_xticks(ticks=[mu_truth], labels=['$\mu_{truth}$']) # パラメータラベル
@@ -224,7 +242,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/gaussian_model/parameter_updates/posterior.mp4', 
+    filename='../../figure/gaussian_model/parameter_updates_mean/posterior.mp4', 
     progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
 )
 
@@ -291,7 +309,7 @@ def update(i):
     ax.set_title(predict_param_lbl, loc='left') # パラメータラベル
     ax.legend(loc='upper right', prop={'size': 8})
     ax.grid(zorder=0)
-    ax.set_xlim(xmin=x_min, xmax=x_max) # 描画範囲を固定
+    ax.set_xlim(xmin=x_min, xmax=x_max)  # 描画範囲を固定
     ax.set_ylim(ymin=0.0, ymax=dens_max) # 描画範囲を固定
 
 # 動画を作成
@@ -302,7 +320,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/gaussian_model/parameter_updates/predict.mp4', 
+    filename='../../figure/gaussian_model/parameter_updates_mean/predict.mp4', 
     progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
 )
 
@@ -315,15 +333,17 @@ anim.save(
 bin_num = 40
 
 # 階級値を作成
-bin_size = (x_max - x_min) / bin_num
-bin_min  = x_min - 0.5*bin_size
-bin_max  = x_max + 0.5*bin_size
-_, bin_vec = np.histogram(a=x_n, bins=bin_num+1, range=(bin_min, bin_max), density=True)
-center_vec = bin_vec[:-1] + 0.5*bin_size
+bin_size = (x_max - x_min) / bin_num # 階級幅
+bin_min  = x_min - 0.5*bin_size # 境界値の最小値
+bin_max  = x_max + 0.5*bin_size # 境界値の最大値
+_, bin_vec = np.histogram(a=x_n, bins=bin_num+1, range=(bin_min, bin_max), density=True) # 境界値
+center_vec = bin_vec[:-1] + 0.5*bin_size # 階級値
 
 # ラベル位置を設定
-loc_margin_x = 0.96
-loc_margin_y = 0.9
+posterior_loc_x = 0.02
+posterior_loc_y = 0.96
+predict_loc_x   = 0.02
+predict_loc_y   = 0.96
 
 # 確率密度軸の範囲を設定
 u = 0.05
@@ -342,7 +362,7 @@ fig, axes = plt.subplots(
 )
 fig.suptitle('Bayesian inference', fontsize=20)
 axes2 = [ax.twiny() for ax in axes] # 第2軸の設定用
-ax2y = axes2[0].twinx() # 第2軸の設定用
+ax2y  = axes[0].twinx() # 第2軸の設定用
 
 # 初期化処理を定義
 def init():
@@ -353,7 +373,7 @@ def update(i):
 
     # 前フレームのグラフを初期化
     [ax.cla() for ax in axes]
-    [ax2.cla() for ax2 in axes2]
+    [ax.cla() for ax in axes2]
     ax2y.cla()
     
     # 値を取得
@@ -372,16 +392,19 @@ def update(i):
     E_x = mu_truth
 
     # 観測データの標本平均を計算
-    bar_x = np.mean(x_n[:n])
+    bar_x = np.mean(x_n[:n]) if n > 0 else np.nan
 
     # 観測データを集計
-    obs_dens_vec, _ = np.histogram(a=x_n[:n], bins=bin_num+1, range=(bin_min, bin_max), density=True)
-
+    if n > 0:
+        obs_dens_vec, _ = np.histogram(a=x_n[:n], bins=bin_num+1, range=(bin_min, bin_max), density=True)
+    else:
+        obs_dens_vec = np.zeros(shape=bin_num+1) # (警告文の回避用)
+    
     # 生成分布のラベルを作成
-    model_param_lbl  = f'$N = {n}, '
-    model_param_lbl += f'\\mu_{{truth}} = {mu_truth:.2f}, \\lambda = {lmd:.5f}, '
-    model_param_lbl += f'E[x] = \\mu_{{truth}} = {E_x:.2f}, '
-    model_param_lbl += f'\\bar{{x}} = {bar_x:.2f}$'
+    model_param_lbl  = f'$N = {n}$\n'
+    model_param_lbl += f'$\\mu_{{truth}} = {mu_truth:.2f}, \\lambda = {lmd:.5f}$\n'
+    model_param_lbl += f'$E[x] = \\mu_{{truth}} = {E_x:.2f}$\n'
+    model_param_lbl += f'$\\bar{{x}} = {bar_x:.2f}$'
 
     # 観測データを描画
     ax = axes[0]
@@ -407,13 +430,19 @@ def update(i):
         label='observation data', zorder=13
     ) # 観測データ
     ax.scatter(
-        x=x, y=0.0, 
-        c='hotpink', s=100, 
+        x=x_n[:n], y=np.zeros(shape=n), 
+        c='hotpink', alpha=0.33, s=25, 
         clip_on=False, zorder=14
     ) # 観測データ
+    ax.scatter(
+        x=x, y=0.0, 
+        c='hotpink', s=100, 
+        clip_on=False, zorder=15
+    ) # 観測データ
+
     ax.text(
-        x=x_min*loc_margin_x, y=predict_dens_max*loc_margin_y, 
-        s=model_param_lbl, ha='left', va='top', 
+        x=predict_loc_x, y=predict_loc_y, 
+        s=model_param_lbl, transform=ax.transAxes, ha='left', va='top', 
         bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5), 
         size = 10, 
         zorder=100
@@ -423,20 +452,20 @@ def update(i):
     ax.set_title('Gaussian distribution', loc='left')
     ax.legend(loc='upper right', prop={'size': 8})
     ax.grid(zorder=0)
-    ax.set_xlim(xmin=x_min, xmax=x_max) # (目盛の共通化用)
+    ax.set_xlim(xmin=x_min, xmax=x_max)          # (目盛の共通化用)
     ax.set_ylim(ymin=0.0, ymax=predict_dens_max) # (目盛の共通化用)
 
     # 第2軸を描画
-    ax2x = axes2[0]
-    ax2x.set_xticks(
+    ax2 = axes2[0]
+    ax2.set_xticks(
         ticks =[E_x, bar_x+1e-10], 
         labels=['$E[x]$', '$\\bar{x}$']
     ) # パラメータラベル
-    ax2x.set_xlim(xmin=x_min, xmax=x_max) # (目盛の共通化用)
+    ax2.set_xlim(xmin=x_min, xmax=x_max) # (目盛の共通化用)
     
-    freq_max  = dens_max * n if n > 0 else 1.0
-    dens_vals = ax.get_yticks() # 確率密度軸目盛を取得
-    freq_vals = dens_vals * bin_size*n   # 度数軸目盛に変換
+    freq_max  = dens_max * bin_size*n if n > 0 else 1.0
+    dens_vals = ax.get_yticks()        # 確率密度軸目盛を取得
+    freq_vals = dens_vals * bin_size*n # 度数軸目盛に変換
 
     ax2y.set_yticks(
         ticks =freq_vals, 
@@ -452,8 +481,8 @@ def update(i):
     E_mu = m
 
     # 事後分布のラベルを作成
-    posterior_param_lbl  = f'$\\hat{{m}} = {m:.2f}, \\hat{{\\lambda}}_{{\\mu}} = {lambda_mu:.5f}, '
-    posterior_param_lbl += f'E[\\mu] = \\hat{{m}} = {E_mu:.2f}$'
+    posterior_param_lbl  = f'$\\hat{{m}} = {m:.2f}, \\hat{{\\lambda}}_{{\\mu}} = {lambda_mu:.5f}$\n'
+    posterior_param_lbl += f'$E[\\mu] = \\hat{{m}} = {E_mu:.2f}$'
 
     # 事後分布を描画
     ax = axes[1]
@@ -473,13 +502,19 @@ def update(i):
         label='posterior distribution', zorder=12
     ) # 事後分布
     ax.scatter(
-        x=x, y=0.0, 
-        c='hotpink', s=100, 
+        x=x_n[:n], y=np.zeros(shape=n), 
+        c='hotpink', alpha=0.33, s=25, 
         clip_on=False, zorder=13
     ) # 観測データ
+    ax.scatter(
+        x=x, y=0.0, 
+        c='hotpink', s=100, 
+        clip_on=False, zorder=14
+    ) # 観測データ
+
     ax.text(
-        x=mu_min*loc_margin_x, y=posterior_dens_max*loc_margin_y, 
-        s=posterior_param_lbl, ha='left', va='top', 
+        x=posterior_loc_x, y=posterior_loc_y, 
+        s=posterior_param_lbl, transform=ax.transAxes, ha='left', va='top', 
         bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5), 
         size = 10, 
         zorder=100
@@ -506,8 +541,8 @@ def update(i):
     E_x = mu_s
     
     # 予測分布のラベルを作成
-    predict_param_lbl  = f'$\\hat{{\\mu}}_{{*}} = {mu_s:.2f}, \\hat{{\\lambda}}_{{*}} = {lambda_s:.5f}, '
-    predict_param_lbl += f'E[x] = \hat{{\\mu}}_{{*}} = {E_x:.2f}$'
+    predict_param_lbl  = f'$\\hat{{\\mu}}_{{*}} = {mu_s:.2f}, \\hat{{\\lambda}}_{{*}} = {lambda_s:.5f}$\n'
+    predict_param_lbl += f'$E[x] = \\hat{{\\mu}}_{{*}} = {E_x:.2f}$'
 
     # 予測分布を描画
     ax = axes[2]
@@ -532,13 +567,19 @@ def update(i):
         label='predict distribution', zorder=13
     ) # 予測分布
     ax.scatter(
-        x=x, y=0.0, 
-        c='hotpink', s=100, 
+        x=x_n[:n], y=np.zeros(shape=n), 
+        c='hotpink', alpha=0.33, s=25, 
         clip_on=False, zorder=14
     ) # 観測データ
+    ax.scatter(
+        x=x, y=0.0, 
+        c='hotpink', s=100, 
+        clip_on=False, zorder=15
+    ) # 観測データ
+    
     ax.text(
-        x=x_min*loc_margin_x, y=predict_dens_max*loc_margin_y, 
-        s=predict_param_lbl, ha='left', va='top', 
+        x=predict_loc_x, y=predict_loc_y, 
+        s=predict_param_lbl, transform=ax.transAxes, ha='left', va='top', 
         bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5), 
         size = 10, 
         zorder=100
@@ -567,7 +608,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/gaussian_model/parameter_updates/observation.mp4', 
+    filename='../../figure/gaussian_model/parameter_updates_mean/observation.mp4', 
     progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
 )
 
