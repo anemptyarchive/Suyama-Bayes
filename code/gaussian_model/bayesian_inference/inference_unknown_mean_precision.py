@@ -162,7 +162,7 @@ b_hat = 0.5 * (np.sum(x_n**2) + beta * m**2 - beta_hat * m_hat**2) + b
 
 ### 分布の計算  -----
 
-# 事前分布の確率密度を計算
+# 事後分布の確率密度を計算
 N_dens_mat         = norm.pdf(x=mu_mat, loc=m_hat, scale=1.0/np.sqrt(beta_hat*lambda_mat))
 Gam_dens_mat       = gamma.pdf(x=lambda_mat, a=a_hat, scale=1.0/b_hat)
 posterior_dens_mat = N_dens_mat * Gam_dens_mat
@@ -206,13 +206,13 @@ ax.plot(
 ) # (凡例表示用のダミー)
 prior_cs = ax.contour(
     mu_mat, lambda_mat, prior_dens_mat, 
-    #cmap='viridis', vmin=0.0, vmax=dens_max, 
+    cmap='viridis', vmin=0.0, vmax=dens_max, 
     linewidths=1.0, linestyles=':', 
     zorder=11
 ) # 事前分布
 posterior_cs = ax.contourf(
     mu_mat, lambda_mat, posterior_dens_mat, 
-    #cmap='viridis', vmin=0.0, vmax=dens_max, 
+    cmap='viridis', vmin=0.0, vmax=dens_max, 
     alpha=0.5, 
     zorder=12
 ) # 事後分布
@@ -272,10 +272,10 @@ ax.plot(
     zorder=10
 ) # 真のパラメータ
 ax.contour(
-    mu_mat, lambda_mat, prior_dens_mat, 
+    X=mu_mat, Y=lambda_mat, Z=prior_dens_mat, offset=0.0, 
     cmap='viridis', vmin=0.0, vmax=dens_max, 
     linewidths=0.8, linestyles=':', 
-    offset=0.0, zorder=11
+    zorder=11
 ) # 事前分布
 ax.plot_surface(
     X=mu_mat, Y=lambda_mat, Z=prior_dens_mat, 
@@ -306,10 +306,10 @@ ax.plot(
     zorder=10
 ) # 真のパラメータ
 ax.contour(
-    mu_mat, lambda_mat, posterior_dens_mat, 
+    X=mu_mat, Y=lambda_mat, Z=posterior_dens_mat, offset=0.0, 
     cmap='viridis', vmin=0.0, vmax=dens_max, 
     linewidths=0.8, linestyles=':', 
-    offset=0.0, zorder=11
+    zorder=11
 ) # 事後分布
 ax.plot_surface(
     X=mu_mat, Y=lambda_mat, Z=posterior_dens_mat, 

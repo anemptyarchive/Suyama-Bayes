@@ -52,8 +52,9 @@ x_n = np.random.normal(loc=mu_truth, scale=1.0/np.sqrt(lmd), size=N)
 
 # x軸の範囲を設定
 u = 5.0
-x_size  = 1.0/np.sqrt(lmd) # 基準値を指定
-x_size *= 4.0 # 倍率を指定
+k = 4.0
+x_size  = 1.0/np.sqrt(lmd) # 標準偏差
+x_size *= k # 定数倍
 x_size  = max(x_size, (x_n-mu_truth).max()) # サンプルと比較
 x_size  = np.ceil(x_size /u)*u # u単位で切り上げ
 x_min   = mu_truth - x_size
@@ -99,14 +100,14 @@ for n in range(N):
     # 観測データを取得
     x = x_n[n]
     
-    # 事後分布のパラメータを計算:式(3.53, 3.54)
+    # 事後分布のパラメータを更新:式(3.53, 3.54)
     lambda_mu_old = lambda_mu
     lambda_mu += lmd
     m         *= lambda_mu_old
     m         += x * lmd
     m         /= lambda_mu
     
-    # 予測分布のパラメータを計算:式(3.62)
+    # 予測分布のパラメータを更新:式(3.62)
     mu_s     = m
     lambda_s = lmd * lambda_mu / (lmd + lambda_mu)
     
@@ -117,7 +118,7 @@ for n in range(N):
     trace_lambda_s_lt.append(lambda_s)
 
     # 動作確認
-    print(f'{n+1} / {N}')
+    print(f'\r{n+1} / {N}', end='', flush=True)
 
 
 # %%
@@ -213,14 +214,14 @@ def update(i):
         label='posterior distribution', zorder=11
     ) # 事後分布
     ax.scatter(
-        x=x_n[:n], y=np.zeros(shape=n), 
+        x=x_n[:n], y=np.zeros(shape=n), clip_on=False, 
         c='hotpink', alpha=0.33, s=25, 
-        clip_on=False, zorder=12
+        zorder=12
     ) # 観測データ
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        label='observation data', clip_on=False, zorder=13
+        label='observation data', zorder=13
     ) # 観測データ
     ax.set_xlabel('$\mu$')
     ax.set_ylabel('density')
@@ -242,8 +243,8 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/gaussian_model/parameter_updates_mean/posterior.mp4', 
-    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+    filename='../../../figure/gaussian_model/parameter_updates_mean/posterior.mp4', 
+    progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
 
@@ -295,14 +296,14 @@ def update(i):
         label='predict distribution', zorder=11
     ) # 予測分布
     ax.scatter(
-        x=x_n[:n], y=np.zeros(shape=n), 
+        x=x_n[:n], y=np.zeros(shape=n), clip_on=False, 
         c='hotpink', alpha=0.33, s=25, 
-        clip_on=False, zorder=12
+        zorder=12
     ) # 観測データ
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        label='observation data', clip_on=False, zorder=12
+        label='observation data', zorder=13
     ) # 観測データ
     ax.set_xlabel('$x$')
     ax.set_ylabel('density')
@@ -320,8 +321,8 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/gaussian_model/parameter_updates_mean/predict.mp4', 
-    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+    filename='../../../figure/gaussian_model/parameter_updates_mean/predict.mp4', 
+    progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
 
@@ -339,20 +340,25 @@ bin_max  = x_max + 0.5*bin_size # 境界値の最大値
 _, bin_vec = np.histogram(a=x_n, bins=bin_num+1, range=(bin_min, bin_max), density=True) # 境界値
 center_vec = bin_vec[:-1] + 0.5*bin_size # 階級値
 
+# p(μ)軸の範囲を設定
+u = 0.05
+posterior_dens_max = np.max(anim_posterior_lt)
+posterior_dens_max = np.ceil(posterior_dens_max /u)*u # u単位で切り上げ
+print(posterior_dens_max)
+
+# p(x)軸の範囲を設定
+u = 0.05
+predict_dens_max = np.max(anim_predict_lt)
+predict_dens_max = np.ceil(predict_dens_max /u)*u # u単位で切り上げ
+print(predict_dens_max)
+
+# %%
+
 # ラベル位置を設定
 posterior_loc_x = 0.02
 posterior_loc_y = 0.96
 predict_loc_x   = 0.02
 predict_loc_y   = 0.96
-
-# 確率密度軸の範囲を設定
-u = 0.05
-posterior_dens_max = np.max(anim_posterior_lt)
-posterior_dens_max = np.ceil(posterior_dens_max /u)*u # u単位で切り上げ
-predict_dens_max   = np.max(anim_predict_lt)
-predict_dens_max   = np.ceil(predict_dens_max /u)*u # u単位で切り上げ
-print(posterior_dens_max)
-print(predict_dens_max)
 
 # 図を初期化
 fig, axes = plt.subplots(
@@ -430,14 +436,14 @@ def update(i):
         label='observation data', zorder=13
     ) # 観測データ
     ax.scatter(
-        x=x_n[:n], y=np.zeros(shape=n), 
+        x=x_n[:n], y=np.zeros(shape=n), clip_on=False, 
         c='hotpink', alpha=0.33, s=25, 
-        clip_on=False, zorder=14
+        zorder=14
     ) # 観測データ
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        clip_on=False, zorder=15
+        zorder=15
     ) # 観測データ
 
     ax.text(
@@ -502,14 +508,14 @@ def update(i):
         label='posterior distribution', zorder=12
     ) # 事後分布
     ax.scatter(
-        x=x_n[:n], y=np.zeros(shape=n), 
+        x=x_n[:n], y=np.zeros(shape=n), clip_on=False, 
         c='hotpink', alpha=0.33, s=25, 
-        clip_on=False, zorder=13
+        zorder=13
     ) # 観測データ
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        clip_on=False, zorder=14
+        zorder=14
     ) # 観測データ
 
     ax.text(
@@ -567,14 +573,14 @@ def update(i):
         label='predict distribution', zorder=13
     ) # 予測分布
     ax.scatter(
-        x=x_n[:n], y=np.zeros(shape=n), 
+        x=x_n[:n], y=np.zeros(shape=n), clip_on=False, 
         c='hotpink', alpha=0.33, s=25, 
-        clip_on=False, zorder=14
+        zorder=14
     ) # 観測データ
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        clip_on=False, zorder=15
+        zorder=15
     ) # 観測データ
     
     ax.text(
@@ -608,8 +614,8 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/gaussian_model/parameter_updates_mean/observation.mp4', 
-    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+    filename='../../../figure/gaussian_model/parameter_updates_mean/observation.mp4', 
+    progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
 

@@ -32,7 +32,7 @@ mu_truth = 0.4
 ### 観測データの設定 -----
 
 # シードを設定(ノートとの対応用)
-#np.random.seed(86)
+np.random.seed(86)
 
 # データ数(試行回数)を指定
 N = 100
@@ -98,7 +98,7 @@ for n in range(N):
     trace_mu_lt.append(mu_star)
 
     # 動作確認
-    print(f'{n+1} / {N}')
+    print(f'\r{n+1} / {N}', end='', flush=True)
 
 
 # %%
@@ -191,9 +191,9 @@ def update(i):
         label='posterior distribution', zorder=11
     ) # 事後分布
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        label='observation data', clip_on=False, zorder=12
+        label='observation data', zorder=12
     ) # 観測データ
     ax.set_xlabel('$\mu$')
     ax.set_ylabel('density')
@@ -215,8 +215,8 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/bernoulli_model/parameter_updates/posterior.mp4', 
-    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+    filename='../../../figure/bernoulli_model/parameter_updates/posterior.mp4', 
+    progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
 
@@ -267,9 +267,9 @@ def update(i):
         label='predict distribution', zorder=11
     ) # 予測分布
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        label='observation data', clip_on=False, zorder=12
+        label='observation data', zorder=12
     ) # 観測データ
     ax.set_xticks(ticks=x_vec) # x軸目盛
     ax.set_xlabel('$x$')
@@ -288,8 +288,8 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/bernoulli_model/parameter_updates/predict.mp4', 
-    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+    filename='../../../figure/bernoulli_model/parameter_updates/predict.mp4', 
+    progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
 
@@ -297,23 +297,25 @@ anim.save(
 
 #### 観測データと分布の関係 -----
 
-# ラベル位置を設定
-posterior_loc_x = 0.02
-posterior_loc_y = 0.98
-predict_loc_x   = 0.02
-predict_loc_y   = 0.96
-
-# 確率密度軸の範囲を設定
+# p(μ)軸の範囲を設定
 u = 0.05
 dens_max = np.max(anim_posterior_lt)
 dens_max = np.ceil(dens_max /u)*u # u単位で切り上げ
 print(dens_max)
 
-# 確率軸の範囲を設定
+# p(x)軸の範囲を設定
 u = 0.05
 prob_max = np.max(anim_predict_lt)
 prob_max = np.ceil(prob_max /u)*u # u単位で切り上げ
 print(prob_max)
+
+# %%
+
+# ラベル位置を設定
+posterior_loc_x = 0.02
+posterior_loc_y = 0.98
+predict_loc_x   = 0.02
+predict_loc_y   = 0.96
 
 # 図を初期化
 fig, axes = plt.subplots(
@@ -389,9 +391,9 @@ def update(i):
         label='observation data', zorder=13
     ) # 観測データ
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        clip_on=False, zorder=14
+        zorder=14
     ) # 観測データ
 
     ax.text(
@@ -457,9 +459,9 @@ def update(i):
         label='posterior distribution', zorder=12
     ) # 事後分布
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        clip_on=False, zorder=13
+        zorder=13
     ) # 観測データ
 
     ax.text(
@@ -517,9 +519,9 @@ def update(i):
         label='predict distribution', zorder=13
     ) # 予測分布
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        clip_on=False, zorder=14
+        zorder=14
     ) # 観測データ
 
     ax.text(
@@ -554,8 +556,8 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/bernoulli_model/parameter_updates/observation.mp4', 
-    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+    filename='../../../figure/bernoulli_model/parameter_updates/observation.mp4', 
+    progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
 

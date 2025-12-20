@@ -34,9 +34,10 @@ lambda_truth = 4.0
 
 # x軸の範囲を設定
 u = 5.0
+k = 3.0
 x_min = 0.0
 x_max = lambda_truth # 基準値を指定
-x_max *= 3.0 # 倍率を指定
+x_max *= k # 定数倍
 #x_max = max(x_max, x_n.max()) # サンプルと比較
 x_max = np.ceil(x_max /u)*u # u単位で切り上げ
 print('x size:', x_min, x_max)
@@ -69,9 +70,11 @@ b = 1.0
 #### 変数の設定 -----
 
 # λ軸の範囲を設定
+u = 5.0
+k = 3.0
 lambda_min = 0.0
 lambda_max = lambda_truth # 基準値を指定
-lambda_max *= 3.0 # 倍率を指定
+lambda_max *= k # 定数倍
 lambda_max = np.ceil(lambda_max /u)*u # u単位で切り上げ
 print('λ size:', lambda_min, lambda_max)
 

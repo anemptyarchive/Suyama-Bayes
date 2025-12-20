@@ -39,8 +39,9 @@ print(1.0/np.sqrt(lambda_truth))
 
 # x軸の範囲を設定
 u = 5.0
+k = 4.0
 x_size  = 1.0/np.sqrt(lambda_truth) # 基準値を指定
-x_size *= 4.0 # 倍率を指定
+x_size *= k # 定数倍
 #x_size  = max(x_size, (x_n-mu_truth).max()) # サンプルと比較
 x_size  = np.ceil(x_size /u)*u # u単位で切り上げ
 x_min   = mu - x_size
@@ -78,8 +79,9 @@ b = 1.0
 lambda_min = 0.0
 #lambda_max = 1.0
 u = 0.5
+k = 3.0
 lambda_max = lambda_truth # 基準値を指定
-lambda_max *= 3.0 # 倍率を指定
+lambda_max *= k # 定数倍
 lambda_max = np.ceil(lambda_max /u)*u # u単位で切り上げ
 print('λ size:', lambda_min, lambda_max)
 
@@ -135,7 +137,7 @@ center_vec = bin_vec[:-1] + 0.5*bin_size
 
 #### パラメータの計算 -----
 
-# lambdaの事後分布のパラメータを計算:式(3.69)
+# 事後分布のパラメータを計算:式(3.69)
 a_hat = 0.5 * N + a
 b_hat = 0.5 * np.sum((x_n - mu)**2) + b
 

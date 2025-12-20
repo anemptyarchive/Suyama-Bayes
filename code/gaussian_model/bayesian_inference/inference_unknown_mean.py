@@ -39,8 +39,9 @@ print(1.0/np.sqrt(lmd))
 
 # x軸の範囲を設定
 u = 5.0
+k = 4.0
 x_size  = 1.0/np.sqrt(lmd) # 基準値を指定
-x_size *= 4.0 # 倍率を指定
+x_size *= k # 定数倍
 #x_size  = max(x_size, (x_n-mu_truth).max()) # サンプルと比較
 x_size  = np.ceil(x_size /u)*u # u単位で切り上げ
 x_min   = mu_truth - x_size

@@ -55,8 +55,9 @@ x_n = np.random.normal(loc=mu, scale=sigma_truth, size=N)
 
 # x軸の範囲を設定
 u = 5.0
-x_size  = sigma_truth # 基準値を指定
-x_size *= 4.0 # 倍率を指定
+k = 4.0
+x_size  = sigma_truth # 標準偏差
+x_size *= k # 定数倍
 x_size  = max(x_size, (x_n-mu).max()) # サンプルと比較
 x_size  = np.ceil(x_size /u)*u # u単位で切り上げ
 x_min   = mu - x_size
@@ -71,8 +72,9 @@ x_vec = np.linspace(start=x_min, stop=x_max, num=1001)
 lambda_min = 0.0
 #lambda_max = 1.0
 u = 0.5
-lambda_max = lambda_truth # 基準値を指定
-lambda_max *= 5.0 # 倍率を指定
+k = 5.0
+lambda_max = lambda_truth # 真値
+lambda_max *= k # 定数倍
 lambda_max = np.ceil(lambda_max /u)*u # u単位で切り上げ
 print('λ size:', lambda_min, lambda_max)
 
@@ -117,11 +119,11 @@ for n in range(N):
     # 観測データを取得
     x = x_n[n]
     
-    # 事後分布のパラメータを計算:式(3.69)
+    # 事後分布のパラメータを更新:式(3.69)
     a += 0.5
     b += 0.5 * (x_n[n] - mu)**2
 
-    # 予測分布のパラメータを計算:式(3.79)
+    # 予測分布のパラメータを更新:式(3.79)
     mu_s     = mu
     lambda_s = a / b
     nu_s     = 2.0 * a
@@ -134,7 +136,7 @@ for n in range(N):
     trace_nu_s_lt.append(nu_s)
 
     # 動作確認
-    print(f'{n+1} / {N}')
+    print(f'\r{n+1} / {N}', end='', flush=True)
 
 
 # %%
@@ -233,14 +235,14 @@ def update(i):
         label='posterior distribution', zorder=11
     ) # 事後分布
     ax.scatter(
-        x=(sigma_truth/(x_n[:n]-mu))**2, y=np.zeros(shape=n), 
+        x=(sigma_truth/(x_n[:n]-mu))**2, y=np.zeros(shape=n), clip_on=False, 
         c='hotpink', alpha=0.33, s=25, 
-        clip_on=False, zorder=12
+        zorder=12
     ) # 観測データ
     ax.scatter(
-        x=(sigma_truth/(x-mu))**2, y=0.0, 
+        x=(sigma_truth/(x-mu))**2, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        label='observation data', clip_on=False, zorder=13
+        label='observation data', zorder=13
     ) # 観測データ
     ax.set_xlabel('$\lambda$')
     ax.set_ylabel('density')
@@ -262,8 +264,8 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/gaussian_model/parameter_updates_precision/posterior.mp4', 
-    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+    filename='../../../figure/gaussian_model/parameter_updates_precision/posterior.mp4', 
+    progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
 
@@ -301,7 +303,7 @@ def update(i):
     
     # 予測分布のラベルを作成
     predict_param_lbl  = f'$N = {n}, '
-    predict_param_lbl += f'\\ = {mu:.2f}, \\lambda_{{truth}} = {lambda_truth:.5f}, '
+    predict_param_lbl += f'\\mu = {mu:.2f}, \\lambda_{{truth}} = {lambda_truth:.5f}, '
     predict_param_lbl += f'\\mu_{{s}} = {mu_s:.2f}, \\hat{{\\lambda}}_{{s}} = {lambda_s:.5f}, \\hat{{\\nu}}_{{s}} = {nu_s:.1f}$'
 
     # 予測分布を描画
@@ -316,14 +318,14 @@ def update(i):
         label='predict distribution', zorder=11
     ) # 予測分布
     ax.scatter(
-        x=x_n[:n], y=np.zeros(shape=n), 
+        x=x_n[:n], y=np.zeros(shape=n), clip_on=False, 
         c='hotpink', alpha=0.33, s=25, 
-        clip_on=False, zorder=12
+        zorder=12
     ) # 観測データ
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        label='observation data', clip_on=False, zorder=12
+        label='observation data', zorder=13
     ) # 観測データ
     ax.set_xlabel('$x$')
     ax.set_ylabel('density')
@@ -341,8 +343,8 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/gaussian_model/parameter_updates_precision/predict.mp4', 
-    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+    filename='../../../figure/gaussian_model/parameter_updates_precision/predict.mp4', 
+    progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
 
@@ -360,20 +362,25 @@ bin_max  = x_max + 0.5*bin_size # 境界値の最大値
 _, bin_vec = np.histogram(a=x_n, bins=bin_num+1, range=(bin_min, bin_max), density=True) # 境界値
 center_vec = bin_vec[:-1] + 0.5*bin_size # 階級値
 
+# p(λ)軸の範囲を設定
+u = 0.05
+posterior_dens_max = np.max(anim_posterior_lt)
+posterior_dens_max = np.ceil(posterior_dens_max /u)*u # u単位で切り上げ
+print(posterior_dens_max)
+
+# p(x)軸の範囲を設定
+u = 0.05
+predict_dens_max = np.max(anim_predict_lt)
+predict_dens_max = np.ceil(predict_dens_max /u)*u # u単位で切り上げ
+print(predict_dens_max)
+
+# %%
+
 # ラベル位置を設定
 posterior_loc_x = 0.02
 posterior_loc_y = 0.98
 predict_loc_x   = 0.02
 predict_loc_y   = 0.96
-
-# 確率密度軸の範囲を設定
-u = 0.05
-posterior_dens_max = np.max(anim_posterior_lt)
-posterior_dens_max = np.ceil(posterior_dens_max /u)*u # u単位で切り上げ
-predict_dens_max   = np.max(anim_predict_lt)
-predict_dens_max   = np.ceil(predict_dens_max /u)*u # u単位で切り上げ
-print(posterior_dens_max)
-print(predict_dens_max)
 
 # 図を初期化
 fig, axes = plt.subplots(
@@ -382,8 +389,8 @@ fig, axes = plt.subplots(
     constrained_layout=True
 )
 fig.suptitle('Bayesian inference', fontsize=20)
-axes2x = [ax.twiny() for ax in [axes[1, 0], axes[1, 1], axes[2, 0]]] # 第2軸の設定用
-axes2y = [ax.twinx() for ax in [axes[0, 0], axes[1, 0]]]             # 第2軸の設定用
+axes2x = [ax.twiny() for ax in [axes[1, 0], axes[1, 1], axes[2, 0], axes[2, 1]]] # 第2軸の設定用
+axes2y = [ax.twinx() for ax in [axes[0, 0], axes[1, 0]]] # 第2軸の設定用
 
 # 初期化処理を定義
 def init():
@@ -400,12 +407,11 @@ def update(i):
     # 値を取得
     n = i # データ番号
     x = x_n[i-1] if n > 0 else np.nan # 観測値
-    a        = trace_a_lt[i] # 形状パラメータ
-    b        = trace_b_lt[i] # 尺度パラメータ
+    a        = trace_a_lt[i]        # 形状パラメータ
+    b        = trace_b_lt[i]        # 尺度パラメータ
     mu_s     = trace_mu_s_lt[i]     # 位置パラメータ
     lambda_s = trace_lambda_s_lt[i] # 尺度パラメータ
     nu_s     = trace_nu_s_lt[i]     # 自由度パラメータ
-    sigma_truth = 1.0/np.sqrt(lambda_truth)
     posterior_dens_vec = anim_posterior_lt[i] # 確率密度
     predict_dens_vec   = anim_predict_lt[i]   # 確率密度
 
@@ -518,14 +524,14 @@ def update(i):
         label='observation data', zorder=14
     ) # 観測データ
     ax.scatter(
-        x=x_n[:n], y=np.zeros(shape=n), 
+        x=x_n[:n], y=np.zeros(shape=n), clip_on=False, 
         c='hotpink', alpha=0.33, s=25, 
-        clip_on=False, zorder=15
+        zorder=15
     ) # 観測データ
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        clip_on=False, zorder=16
+        zorder=16
     ) # 観測データ
 
     ax.text(
@@ -544,12 +550,12 @@ def update(i):
     ax.set_ylim(ymin=0.0, ymax=predict_dens_max) # (目盛の共通化用)
 
     # 第2軸を描画
-    ax2 = axes2x[0]
-    ax2.set_xticks(
+    ax2x = axes2x[0]
+    ax2x.set_xticks(
         ticks =[mu+sigma_truth, E_x, bar_x+1e-10], 
         labels=['$\\mu + \\sigma_{truth}$', '$E[x]$', '$\\bar{x}$']
     ) # パラメータラベル
-    ax2.set_xlim(xmin=x_min, xmax=x_max) # (目盛の共通化用)
+    ax2x.set_xlim(xmin=x_min, xmax=x_max) # (目盛の共通化用)
     
     freq_max  = predict_dens_max * bin_size*n if n > 0 else 1.0
     dens_vals = ax.get_yticks()        # 確率密度軸目盛を取得
@@ -568,11 +574,10 @@ def update(i):
 
     # 事後分布の期待値を計算
     E_lambda = a / b
-    E_sigma  = 1.0/np.sqrt(E_lambda) # (処理の効率化用)
 
     # 事後分布のラベルを作成
     posterior_param_lbl  = f'$\\hat{{a}} = {a:.1f}, \\hat{{b}} = {b:.1f}$\n'
-    posterior_param_lbl += f'$E[\\lambda] = \\frac{{\\hat{{a}}}}{{\\hat{{b}}}} = {E_lambda:.2f}$'
+    posterior_param_lbl += f'$E[\\lambda] = \\frac{{\\hat{{a}}}}{{\\hat{{b}}}} = {E_lambda:.3f}$'
 
     # 事後分布を描画
     ax = axes[1, 1]
@@ -592,14 +597,14 @@ def update(i):
         label='posterior distribution', zorder=12
     ) # 事後分布
     ax.scatter(
-        x=(sigma_truth/(x_n[:n]-mu))**2, y=np.zeros(shape=n), 
+        x=(sigma_truth/(x_n[:n]-mu))**2, y=np.zeros(shape=n), clip_on=False, 
         c='hotpink', alpha=0.33, s=25, 
-        clip_on=False, zorder=13
+        zorder=13
     ) # 観測データ
     ax.scatter(
-        x=(sigma_truth/(x-mu))**2, y=0.0, 
+        x=(sigma_truth/(x-mu))**2, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        clip_on=False, zorder=14
+        zorder=14
     ) # 観測データ
 
     ax.text(
@@ -618,12 +623,12 @@ def update(i):
     ax.set_ylim(ymin=0.0, ymax=posterior_dens_max) # 描画範囲を固定
 
     # 第2軸を描画
-    ax2 = axes2x[1]
-    ax2.set_xticks(
+    ax2x = axes2x[1]
+    ax2x.set_xticks(
         ticks =[lambda_truth, E_lambda+1e-10], 
-        labels=['$\\lambda_{{truth}}$', '$E[\\lambda]$']
+        labels=['$\\lambda_{truth}$', '$E[\\lambda]$']
     ) # パラメータラベル
-    ax2.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
+    ax2x.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
 
     ##### 予測分布の作図 -----
 
@@ -636,8 +641,8 @@ def update(i):
 
     # 予測分布を描画
     ax = axes[2, 0]
-    ax.hlines(
-        y=norm.pdf(x=mu, loc=mu, scale=sigma_truth), xmin=mu, xmax=x_max, 
+    ax.axhline(
+        y=norm.pdf(x=mu, loc=mu, scale=sigma_truth), 
         color='red', linewidth=1.0, linestyle='--', 
         zorder=10
     ) # 真のパラメータ
@@ -646,8 +651,8 @@ def update(i):
         color='red', linewidth=1.0, linestyle='--', 
         zorder=10
     ) # 既知のパラメータ
-    ax.hlines(
-        y=t.pdf(x=E_x, df=nu_s, loc=E_x, scale=E_sigma), xmin=E_x, xmax=x_max, 
+    ax.axhline(
+        y=t.pdf(x=E_x, df=nu_s, loc=E_x, scale=1.0/np.sqrt(lambda_s)), 
         color='purple', linewidth=1.0, linestyle='--', 
         zorder=11
     ) # 期待値
@@ -667,14 +672,14 @@ def update(i):
         label='predict distribution', zorder=13
     ) # 予測分布
     ax.scatter(
-        x=x_n[:n], y=np.zeros(shape=n), 
+        x=x_n[:n], y=np.zeros(shape=n), clip_on=False, 
         c='hotpink', alpha=0.33, s=25, 
-        clip_on=False, zorder=14
+        zorder=14
     ) # 観測データ
     ax.scatter(
-        x=x, y=0.0, 
+        x=x, y=0.0, clip_on=False, 
         c='hotpink', s=100, 
-        clip_on=False, zorder=15
+        zorder=15
     ) # 観測データ
 
     ax.text(
@@ -693,47 +698,53 @@ def update(i):
     ax.set_ylim(ymin=0.0, ymax=predict_dens_max) # (目盛の共通化用)
 
     # 第2軸を描画
-    ax2 = axes2x[2]
-    ax2.set_xticks(
+    ax2x = axes2x[2]
+    ax2x.set_xticks(
         ticks =[mu, E_x+1e-10], 
         labels=['$\\mu$', '$E[x]$']
     ) # パラメータラベル
-    ax2.set_xlim(xmin=x_min, xmax=x_max) # (目盛の共通化用)
+    ax2x.set_xlim(xmin=x_min, xmax=x_max) # (目盛の共通化用)
 
     ##### 軸変換の作図：(λ to p(λ)) -----
 
     # (警告文の回避用)
     tmp_lambda_vec = lambda_vec[lambda_vec > 0.0]
 
+    # 確率密度を計算
+    tmp_N_dens_vec = norm.pdf(x=mu, loc=mu, scale=1.0/np.sqrt(tmp_lambda_vec))
+    tmp_N_dens_val = norm.pdf(x=mu, loc=mu, scale=sigma_truth)
+    tmp_t_dens_vec = t.pdf(x=mu_s, df=nu_s, loc=mu_s, scale=1.0/np.sqrt(tmp_lambda_vec))
+    tmp_t_dens_val = t.pdf(x=mu_s, df=nu_s, loc=mu_s, scale=1.0/np.sqrt(lambda_s))
+
     # 変換曲線を描画
     ax = axes[2, 1]
     ax.plot(
-        tmp_lambda_vec, norm.pdf(x=np.tile(mu, reps=len(tmp_lambda_vec)), loc=mu, scale=1.0/np.sqrt(tmp_lambda_vec)), 
+        tmp_lambda_vec, tmp_N_dens_vec, 
         color='black', linewidth=1.0, linestyle='--', 
         label='$N(x = \\mu \\mid \\mu, \\lambda^{-1})$', zorder=10
     ) # 変換曲線:ガウス分布
     ax.plot(
-        tmp_lambda_vec, t.pdf(x=np.tile(mu_s, reps=len(tmp_lambda_vec)), df=nu_s, loc=mu_s, scale=1.0/np.sqrt(tmp_lambda_vec)), 
+        tmp_lambda_vec, tmp_t_dens_vec, 
         color='black', linewidth=1.0, 
         label='$St(x = \\mu_s \\mid \\mu_s, \\lambda, \\hat{\\nu}_s)$', zorder=11
     ) # 変換曲線:t分布
     ax.vlines(
-        x=lambda_truth, ymin=norm.pdf(x=mu, loc=mu, scale=sigma_truth), ymax=lambda_max, 
+        x=lambda_truth, ymin=tmp_N_dens_val, ymax=lambda_max, 
         color='red', linewidth=1.0, linestyle='--', 
         zorder=12
     ) # 真のパラメータ
     ax.hlines(
-        y=norm.pdf(x=mu, loc=mu, scale=sigma_truth), xmin=lambda_min, xmax=lambda_truth, 
+        y=tmp_N_dens_val, xmin=lambda_min, xmax=lambda_truth, 
         color='red', linewidth=1.0, linestyle='--', 
         zorder=12
     ) # 真のパラメータ
     ax.vlines(
-        x=E_lambda, ymin=t.pdf(x=mu_s, df=nu_s, loc=mu_s, scale=E_sigma), ymax=lambda_max, 
+        x=lambda_s, ymin=tmp_t_dens_val, ymax=lambda_max, 
         color='purple', linewidth=1.0, linestyle='--', 
         zorder=13
     ) # 期待値
     ax.hlines(
-        y=t.pdf(x=mu_s, df=nu_s, loc=mu_s, scale=E_sigma), xmin=lambda_min, xmax=E_lambda, 
+        y=tmp_t_dens_val, xmin=lambda_min, xmax=lambda_s, 
         color='purple', linewidth=1.0, linestyle='--', 
         zorder=13
     ) # 期待値
@@ -745,6 +756,14 @@ def update(i):
     ax.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
     ax.set_ylim(ymin=0.0, ymax=predict_dens_max)  # (目盛の共通化用)
 
+    # 第2軸を描画
+    ax2x = axes2x[3]
+    ax2x.set_xticks(
+        ticks =[lambda_truth, lambda_s+1e-10], 
+        labels=['$\\lambda_{truth}$', '$\\hat{\\lambda}_s$']
+    ) # パラメータラベル
+    ax2x.set_xlim(xmin=lambda_min, xmax=lambda_max) # (目盛の共通化用)
+
 # 動画を作成
 anim = FuncAnimation(
     fig=fig, func=update, init_func=init, 
@@ -753,8 +772,8 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../figure/gaussian_model/parameter_updates_precision/observation.mp4', 
-    progress_callback=lambda i, n: print(f'frame: {i+1} / {n}')
+    filename='../../../figure/gaussian_model/parameter_updates_precision/observation.mp4', 
+    progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
 

@@ -160,7 +160,7 @@ for n in range(N):
     trace_nu_s_lt.append(nu_s)
 
     # 動作確認
-    print(f'{n+1} / {N}')
+    print(f'\r{n+1} / {N}', end='', flush=True)
 
 
 # %%
