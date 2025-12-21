@@ -28,8 +28,8 @@ mu_truth <- 0.25
 #### 変数の設定 -----
 
 # x軸の範囲を設定
-x_min <- 0
-x_max <- 1
+x_min <- 0 # (固定)
+x_max <- 1 # (固定)
 
 # x軸の値を作成
 x_vec <- seq(from = x_min, to = x_max, by = 1)
@@ -57,8 +57,8 @@ b <- 1
 #### 変数の設定 -----
 
 # μ軸の範囲を設定
-mu_min <- 0
-mu_max <- 1
+mu_min <- 0 # (固定)
+mu_max <- 1 # (固定)
 
 # μ軸の値を作成
 mu_vec <- seq(from = mu_min, to = mu_max, length.out = 1001)
@@ -110,8 +110,8 @@ b_hat <- N - sum(x_n) + b
 # 事後分布の確率密度を計算
 posterior_df <- tibble::tibble(
   mu   = mu_vec, # 確率変数
-  a    = a_hat, # パラメータ
-  b    = b_hat, # パラメータ
+  a    = a_hat, # 形状パラメータ
+  b    = b_hat, # 形状パラメータ
   dens = dbeta(x = mu, shape1 = a, shape2 = b) # 確率密度
 )
 
@@ -121,12 +121,12 @@ posterior_df <- tibble::tibble(
 # 事後分布のラベルを作成
 posterior_param_lbl <- paste0(
   "list(", 
-  "N == ", N, ", ", 
+  "N == ",         N, ", ", 
   "mu[truth] == ", round(mu_truth, digits = 2), ", ", 
-  "a == ", round(a, digits = 1), ", ", 
-  "b == ", round(b, digits = 1), ", ", 
-  "hat(a) == ", round(a_hat, digits = 1), ", ", 
-  "hat(b) == ", round(b_hat, digits = 1), 
+  "a == ",         round(a, digits = 1), ", ", 
+  "b == ",         round(b, digits = 1), ", ", 
+  "hat(a) == ",    round(a_hat, digits = 1), ", ", 
+  "hat(b) == ",    round(b_hat, digits = 1), 
   ")"
 ) |> 
   parse(text = _)
@@ -195,8 +195,8 @@ predict_df <- tibble::tibble(
 # 予測分布のラベルを作成
 predict_param_lbl <- paste0(
   "list(", 
-  "N == ", N, ", ", 
-  "mu[truth] == ", round(mu_truth, digits = 2), ", ", 
+  "N == ",            N, ", ", 
+  "mu[truth] == ",    round(mu_truth, digits = 2), ", ", 
   "hat(mu)['*'] == ", round(mu_star_hat, digits = 1), 
   ")"
 ) |> 

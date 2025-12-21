@@ -26,7 +26,7 @@ lambda_truth <- 4
 
 ### 観測データの設定 -----
 
-# (ノートとの対応用)
+# シードを設定:(ノートとの対応用)
 set.seed(86)
 
 # データ数(試行回数)を指定
@@ -40,9 +40,10 @@ x_n <- rpois(n = N ,lambda = lambda_truth)
 
 # x軸の範囲を設定
 u <- 5
+k <- 3
 x_min <- 0
 x_max <- lambda_truth |> # 基準値を指定
-  (\(.) {. * 3})() |> # 倍率を指定
+  (\(.) {. * k})() |> # 定数倍
   (\(.) {max(., x_n)})() |> # # サンプルと比較
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
 cat('x size:', x_min, x_max)
@@ -52,8 +53,8 @@ x_vec <- seq(from = x_min, to = x_max, by = 1)
 
 
 # λ軸の範囲を設定
-lambda_min <- x_min
-lambda_max <- x_max
+lambda_min <- x_min # (固定)
+lambda_max <- x_max # (固定)
 cat('λ size:', lambda_min, lambda_max)
 
 # λ軸の値を作成
@@ -132,14 +133,24 @@ trace_p_i <- (0:N + b) / (1 + 0:N + b)
 
 ### 推移の作図 -----
 
+
+#### 分布の計算 -----
+
 # 観測データを格納
 anim_sample_df <- tibble::tibble(
   n = 0:N,       # データ番号
   x = c(NA, x_n) # 観測値
 )
 
-
-#### 事後分布の作図 -----
+# 生成分布の確率を計算
+anim_model_df <- tidyr::expand_grid(
+  n = 0:N, # データ番号
+  tibble::tibble(
+    x      = x_vec, # 確率変数
+    lambda = lambda_truth, # 期待値パラメータ
+    prob   = dpois(x = x, lambda = lambda) # 確率
+  )
+) # 試行ごとに分布を複製
 
 # 事後分布の確率密度を計算
 anim_posterior_df <- tidyr::expand_grid(
@@ -152,21 +163,33 @@ anim_posterior_df <- tidyr::expand_grid(
     dens = dgamma(x = lambda, shape = a, rate = b) # 確率密度
   )
 
+# 予測分布の確率を計算
+anim_predict_df <- tidyr::expand_grid(
+  n = 0:N,  # 試行回数
+  x = x_vec # 確率変数
+) |> # 試行ごとに変数を複製
+  dplyr::mutate(
+    r    = trace_r_i[n+1], # 成功回数パラメータ
+    p    = trace_p_i[n+1], # 成功確率パラメータ
+    prob = dnbinom(x = x, size = r, prob = p), # 確率
+  )
+
+
+#### 事後分布の作図 -----
+
 # 事後分布のラベルを作成
 anim_param_df <- tibble::tibble(
   n = 0:N, 
   a = trace_a_i, 
   b = trace_b_i, 
-  posterior_param_lbl = paste0(
-    "list(", 
-    "N == ", n, ", ", 
-    "lambda[truth] == ", round(lambda_truth, digits = 2), ", ", 
-    "hat(a) == ", round(a, digits = 1), ", ", 
-    "hat(b) == ", round(b, digits = 1), 
-    ")"
+  posterior_param_lbl = sprintf(
+    fmt = "list(N == '%s', lambda[truth] == '%s', hat(a) == '%s', hat(b) == '%s')", 
+    formatC(n,            digits = 0, format = "d"), 
+    formatC(lambda_truth, digits = 2, format = "f"), 
+    formatC(a,            digits = 1, format = "f"), 
+    formatC(b,            digits = 1, format = "f")
   )
 )
-
 
 # 事後分布を作図
 posterior_graph <- ggplot() + 
@@ -237,42 +260,19 @@ gganimate::animate(
 
 #### 予測分布の作図 -----
 
-# 生成分布の確率を計算
-anim_model_df <- tidyr::expand_grid(
-  n = 0:N, # データ番号
-  tibble::tibble(
-    x      = x_vec, # 確率変数
-    lambda = lambda_truth, # 期待値パラメータ
-    prob   = dpois(x = x, lambda = lambda) # 確率
-  )
-) # 試行ごとに分布を複製
-
-# 予測分布の確率を計算
-anim_predict_df <- tidyr::expand_grid(
-  n = 0:N,  # 試行回数
-  x = x_vec # 確率変数
-) |> # 試行ごとに変数を複製
-  dplyr::mutate(
-    r    = trace_r_i[n+1], # 成功回数パラメータ
-    p    = trace_p_i[n+1], # 成功確率パラメータ
-    prob = dnbinom(x = x, size = r, prob = p), # 確率
-  )
-
 # 予測分布のラベルを作成
 anim_param_df <- tibble::tibble(
   n = 0:N, 
   r = trace_r_i, 
   p = trace_p_i, 
-  predict_param_lbl = paste0(
-    "list(", 
-    "N == ", n, ", ", 
-    "lambda[truth] == ", round(lambda_truth, digits = 2), ", ", 
-    "hat(r) == ", round(r, digits = 1), ", ", 
-    "hat(p) == ", round(p, digits = 5), 
-    ")"
+  predict_param_lbl = sprintf(
+    fmt = "list(N == '%s', lambda[truth] == '%s', hat(r) == '%s', hat(p) == '%s')", 
+    formatC(n,            digits = 0, format = "d"), 
+    formatC(lambda_truth, digits = 2, format = "f"), 
+    formatC(r,            digits = 1, format = "f"), 
+    formatC(p,            digits = 5, format = "f")
   )
 )
-
 
 # 予測分布を作図
 predict_graph <- ggplot() + 
@@ -344,31 +344,21 @@ gganimate::animate(
 dir_path <- "figure/tmp_folder"
 
 
-# 確率軸の範囲を設定
+# p(λ)軸の範囲を設定
 u <- 0.05
-prob_max <- dnbinom(
-  x    = ifelse(
-    test = trace_r_i > 0, 
-    yes  = floor((trace_r_i - 1) * (1 - trace_p_i) / trace_p_i), 
-    no   = 0
-  ), # 最頻値
-  size = trace_r_i, 
-  prob = trace_p_i
-) |> 
-  max() |> 
-  (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
-prob_max
-
-# 確率密度軸の範囲を設定
-u <- 0.05
-dens_max <- dgamma(
-  x     = (trace_a_i - 1) / trace_b_i, # 最頻値
-  shape = trace_a_i, 
-  rate  = trace_b_i
-) |> 
+dens_max <- anim_posterior_df |> 
+  dplyr::pull(dens) |> 
   max() |> 
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
 dens_max
+
+# p(x)軸の範囲を設定
+u <- 0.05
+prob_max <- anim_predict_df |> 
+  dplyr::pull(prob) |> 
+  max() |> 
+  (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
+prob_max
 
 # 試行ごとに作図
 for(i in 1:(N+1)) {
@@ -416,13 +406,12 @@ for(i in 1:(N+1)) {
     ) # 未観測値を補完
   
   # 生成分布のラベルを作成
-  model_param_lbl <- paste0(
-    "list(", 
-    "N == ", n, ", ", 
-    "lambda[truth] == ", round(lambda_truth, digits = 2), ", ", 
-    "paste(E(x) == lambda[truth], {} == ", round(E_x, digits = 2), ")", ", ", 
-    "bar(x) == ", round(bar_x, digits = 2), 
-    ")"
+  model_param_lbl <- sprintf(
+    fmt = "list(N == '%s', lambda[truth] == '%s', paste(E(x) == lambda[truth], {} == '%s'), bar(x) == '%s')", 
+    formatC(n,            digits = 0, format = "d"), 
+    formatC(lambda_truth, digits = 2, format = "f"), 
+    formatC(E_x,          digits = 2, format = "f"), 
+    formatC(bar_x,        digits = 2, format = "f")
   ) |> 
     parse(text = _)
   
@@ -528,12 +517,11 @@ for(i in 1:(N+1)) {
   )
   
   # 事後分布のラベルを作成
-  posterior_param_lbl <- paste0(
-    "list(", 
-    "hat(a) == ", round(a, digits = 1), ", ", 
-    "hat(b) == ", round(b, digits = 1), ", ", 
-    "paste(E(lambda) == frac(hat(a), hat(b)), {} == ", round(E_lambda, digits = 2), ")", 
-    ")"
+  posterior_param_lbl <- sprintf(
+    fmt = "list(hat(a) == '%s', hat(b) == '%s', paste(E(lambda) == frac(hat(a), hat(b)), {} == '%s'))", 
+    formatC(a,        digits = 1, format = "f"), 
+    formatC(b,        digits = 1, format = "f"), 
+    formatC(E_lambda, digits = 2, format = "f")
   ) |> 
     parse(text = _)
   
@@ -604,12 +592,11 @@ for(i in 1:(N+1)) {
   )
   
   # 予測分布のラベルを作成
-  predict_param_lbl <- paste0(
-    "list(", 
-    "hat(r) == ", round(r, digits = 1), ", ", 
-    "hat(p) == ", round(p, digits = 5), ", ", 
-    "paste(E(x) == frac(hat(r) * (1-hat(p)), hat(p)), {} == ", round(E_x, digits = 2), ")", 
-    ")"
+  predict_param_lbl <- sprintf(
+    fmt = "list(hat(r) == '%s', hat(p) == '%s', paste(E(x) == frac(hat(r) * (1-hat(p)), hat(p)), {} == '%s'))", 
+    formatC(r,   digits = 1, format = "f"), 
+    formatC(p,   digits = 5, format = "f"), 
+    formatC(E_x, digits = 2, format = "f")
   ) |> 
     parse(text = _)
   

@@ -38,7 +38,7 @@ print(sigma_truth)
 
 ### 観測データの生成 -----
 
-# シードを設定(ノートとの対応用)
+# シードを設定:(ノートとの対応用)
 np.random.seed(86)
 
 # データ数(試行回数)を指定
@@ -1028,7 +1028,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/gaussian_model/parameter_updates_mean_precision/_observation.mp4', 
+    filename='../../../figure/gaussian_model/parameter_updates_mean_precision/observation.mp4', 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 

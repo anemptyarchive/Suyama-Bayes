@@ -29,9 +29,10 @@ lambda_truth <- 4
 
 # x軸の範囲を設定
 u <- 5
+k <- 3
 x_min <- 0
 x_max <- lambda_truth |> # 基準値を指定
-  (\(.) {. * 3})() |> # 倍率を指定
+  (\(.) {. * k})() |> # 定数倍
   #(\(.) {max(., x_n)})() |> # # サンプルと比較
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
 
@@ -62,9 +63,10 @@ b <- 1
 
 # λ軸の範囲を設定
 u <- 5
+k <- 3
 lambda_min <- 0
 lambda_max <- lambda_truth |> # 基準値を指定
-  (\(.) {. * 3})() |> # 倍率を指定
+  (\(.) {. * k})() |> # 定数倍
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
 
 # λ軸の値を作成
@@ -136,12 +138,12 @@ posterior_df <- tibble::tibble(
 # 事後分布のラベルを作成
 posterior_param_lbl <- paste0(
   "list(", 
-  "N == ", N, ", ", 
+  "N == ",             N, ", ", 
   "lambda[truth] == ", round(lambda_truth, digits = 2), ", ", 
-  "a == ", round(a, digits = 1), ", ", 
-  "b == ", round(b, digits = 1), ", ", 
-  "hat(a) == ", round(a_hat, digits = 1), ", ", 
-  "hat(b) == ", round(b_hat, digits = 1), 
+  "a == ",             round(a, digits = 1), ", ", 
+  "b == ",             round(b, digits = 1), ", ", 
+  "hat(a) == ",        round(a_hat, digits = 1), ", ", 
+  "hat(b) == ",        round(b_hat, digits = 1), 
   ")"
 ) |> 
   parse(text = _)
@@ -216,10 +218,10 @@ predict_df <- tibble::tibble(
 # 予測分布のラベルを作成
 predict_param_lbl <- paste0(
   "list(", 
-  "N == ", N, ", ", 
+  "N == ",             N, ", ", 
   "lambda[truth] == ", round(lambda_truth, digits = 2), ", ", 
-  "hat(r) == ", round(r_hat, digits = 1), ", ", 
-  "hat(p) == ", round(p_hat, digits = 5), 
+  "hat(r) == ",        round(r_hat, digits = 1), ", ", 
+  "hat(p) == ",        round(p_hat, digits = 5), 
   ")"
 ) |> 
   parse(text = _)

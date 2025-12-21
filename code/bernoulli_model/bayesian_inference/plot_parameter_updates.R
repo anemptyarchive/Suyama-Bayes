@@ -26,7 +26,7 @@ mu_truth <- 0.25
 
 ### 観測データの設定 -----
 
-# (ノートとの対応用)
+# シードを設定:(ノートとの対応用)
 set.seed(86)
 
 # データ数(試行回数)を指定
@@ -39,8 +39,8 @@ x_n <- rbinom(n = N, size = 1, prob = mu_truth)
 #### 変数の設定 -----
 
 # x軸の範囲を設定
-x_min <- 0
-x_max <- 1
+x_min <- 0 # (固定)
+x_max <- 1 # (固定)
 cat('x size:', x_min, x_max)
 
 # x軸の値を作成
@@ -48,8 +48,8 @@ x_vec <- seq(from = x_min, to = x_max, by = 1)
 
 
 # μ軸の範囲を設定
-mu_min <- x_min
-mu_max <- x_max
+mu_min <- x_min # (固定)
+mu_max <- x_max # (固定)
 cat('μ size:', mu_min, mu_max)
 
 # μ軸の値を作成
@@ -77,7 +77,7 @@ trace_a_i[1]  <- a
 trace_b_i[1]  <- b
 trace_mu_i[1] <- mu_star
 
-# ベイズ推論の処理
+# ベイズ推論による更新
 for(n in 1:N){
   
   # 観測データを取得
@@ -106,15 +106,17 @@ for(n in 1:N){
 a <- 1
 b <- 1
 
-# 事後分布のパラメータを更新:式(3.15)
+# 事後分布のパラメータを計算:式(3.15)
 trace_a_i <- c(a, cumsum(x_n) + a)
 trace_b_i <- c(b, 1:N - cumsum(x_n) + b)
 
-# 予測分布のパラメーターを更新:式(3.19')
+# 予測分布のパラメーターを計算:式(3.19')
 trace_mu_i <- trace_a_i / (trace_a_i + trace_b_i)
 
 
 ### 推移の作図 -----
+
+#### 分布の計算 -----
 
 # 観測データを格納
 anim_sample_df <- tibble::tibble(
@@ -122,8 +124,15 @@ anim_sample_df <- tibble::tibble(
   x = c(NA, x_n) # 観測値
 )
 
-
-#### 事後分布の作図 -----
+# 生成分布の確率を計算
+anim_model_df <- tidyr::expand_grid(
+  n = 0:N, # データ番号
+  tibble::tibble(
+    x    = x_vec, # 確率変数
+    mu   = mu_truth, # 成功確率パラメータ
+    prob = dbinom(x = x, size = 1, prob = mu) # 確率
+  )
+) # 試行ごとに分布を複製
 
 # 事後分布の確率密度を計算
 anim_posterior_df <- tidyr::expand_grid(
@@ -131,26 +140,37 @@ anim_posterior_df <- tidyr::expand_grid(
   mu = mu_vec # 確率変数
 ) |> # 試行ごとに変数を複製
   dplyr::mutate(
-    a    = trace_a_i[n+1], # パラメータ
-    b    = trace_b_i[n+1], # パラメータ
+    a    = trace_a_i[n+1], # 形状パラメータ
+    b    = trace_b_i[n+1], # 形状パラメータ
     dens = dbeta(x = mu, shape1 = a, shape2 = b) # 確率密度
   )
+
+# 予測分布の確率を計算
+anim_predict_df <- tidyr::expand_grid(
+  n = 0:N,  # 試行回数
+  x = x_vec # 確率変数
+) |> # 試行ごとに変数を複製
+  dplyr::mutate(
+    mu   = trace_mu_i[n+1], # 成功確率パラメータ
+    prob = dbinom(x = x, size = 1, prob = mu) # 確率
+  )
+
+
+#### 事後分布の作図 -----
 
 # 事後分布のラベルを作成
 anim_param_df <- tibble::tibble(
   n = 0:N, 
   a = trace_a_i, 
   b = trace_b_i, 
-  posterior_param_lbl = paste0(
-    "list(", 
-    "N == ", n, ", ", 
-    "mu[truth] == ", round(mu_truth, digits = 2), ", ", 
-    "hat(a) == ", round(a, digits = 1), ", ", 
-    "hat(b) == ", round(b, digits = 1), 
-    ")"
+  posterior_param_lbl = sprintf(
+    fmt = "list(N == '%s', mu[truth] == '%s', hat(a) == '%s', hat(b) == '%s')", 
+    formatC(n,        digits = 0, format = "d"), 
+    formatC(mu_truth, digits = 2, format = "f"), 
+    formatC(a,        digits = 1, format = "f"), 
+    formatC(b,        digits = 1, format = "f")
   )
 )
-
 
 # 事後分布を作図
 posterior_graph <- ggplot() + 
@@ -221,37 +241,15 @@ gganimate::animate(
 
 #### 予測分布の作図 -----
 
-# 生成分布の確率を計算
-anim_model_df <- tidyr::expand_grid(
-  n = 0:N, # データ番号
-  tibble::tibble(
-    x    = x_vec, # 確率変数
-    mu   = mu_truth, # 成功確率パラメータ
-    prob = dbinom(x = x, size = 1, prob = mu) # 確率
-  )
-) # 試行ごとに分布を複製
-
-# 予測分布の確率を計算
-anim_predict_df <- tidyr::expand_grid(
-  n = 0:N,  # 試行回数
-  x = x_vec # 確率変数
-) |> # 試行ごとに変数を複製
-  dplyr::mutate(
-    mu   = trace_mu_i[n+1], # 成功確率パラメータ
-    prob = dbinom(x = x, size = 1, prob = mu) # 確率
-  )
-
-
 # 予測分布のラベルを作成
 anim_param_df <- tibble::tibble(
   n  = 0:N, 
   mu = trace_mu_i, 
-  predict_param_lbl = paste0(
-    "list(", 
-    "N == ", n, ", ", 
-    "mu[truth] == ", round(mu_truth, digits = 2), ", ", 
-    "hat(mu)['*'] == ", round(mu, digits = 5), 
-    ")"
+  predict_param_lbl = sprintf(
+    fmt = "list(N == '%s', mu[truth] == '%s', hat(mu)['*'] == '%s')", 
+    formatC(n,        digits = 0, format = "d"), 
+    formatC(mu_truth, digits = 2, format = "f"), 
+    formatC(mu,       digits = 5, format = "f")
   )
 )
 
@@ -325,31 +323,21 @@ gganimate::animate(
 dir_path <- "figure/tmp_folder"
 
 
-# 確率軸の範囲を設定
+# p(μ)軸の範囲を設定
+u <- 0.05
+dens_max <- anim_posterior_df |> 
+  dplyr::pull(dens) |> 
+  max() |> 
+  (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
+dens_max
+
+# p(x)軸の範囲を設定
 u <- 0.25
-prob_max <- dbinom(
-  x    = ifelse(
-    test = trace_mu_i >= 0, 
-    yes  = 1, 
-    no   = 0
-  ), # 最頻値
-  size = 1, 
-  prob = trace_mu_i
-) |> 
+prob_max <- anim_predict_df |> 
+  dplyr::pull(prob) |> 
   max() |> 
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
 prob_max
-
-# 確率密度軸の範囲を設定
-u <- 0.05
-dens_max <- dbeta(
-  x      = (trace_a_i - 1) / (trace_a_i + trace_b_i - 2), # 最頻値
-  shape1 = trace_a_i, 
-  shape2 = trace_b_i
-) |> 
-  max(na.rm = TRUE) |> # (a=b=1の場合は除く)
-  (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
-dens_max
 
 # 試行ごとに作図
 for(i in 1:(N+1)) {
@@ -357,8 +345,8 @@ for(i in 1:(N+1)) {
   # 値を取得
   n       <- i - 1  # データ番号
   x       <- x_n[n] # 観測値
-  a       <- trace_a_i[i]  # パラメータ
-  b       <- trace_b_i[i]  # パラメータ
+  a       <- trace_a_i[i]  # 形状パラメータ
+  b       <- trace_b_i[i]  # 形状パラメータ
   mu_star <- trace_mu_i[i] # 成功確率パラメータ
   
   # 観測データを格納
@@ -388,13 +376,12 @@ for(i in 1:(N+1)) {
   )
   
   # 生成分布のラベルを作成
-  model_param_lbl <- paste0(
-    "list(", 
-    "N == ", n, ", ", 
-    "mu[truth] == ", round(mu_truth, digits = 2), ", ", 
-    "paste(E(x) == mu[truth], {} == ", round(E_x, digits = 2), ")", ", ", 
-    "bar(x) == ", round(bar_x, digits = 5), 
-    ")"
+  model_param_lbl <- sprintf(
+    fmt = "list(N == '%s', mu[truth] == '%s', paste(E(x) == mu[truth], {} == '%s'), bar(x) == '%s')", 
+    formatC(n,        digits = 0, format = "d"), 
+    formatC(mu_truth, digits = 2, format = "f"), 
+    formatC(E_x,      digits = 2, format = "f"), 
+    formatC(bar_x,    digits = 5, format = "f")
   ) |> 
     parse(text = _)
   
@@ -500,12 +487,11 @@ for(i in 1:(N+1)) {
   )
   
   # 事後分布のラベルを作成
-  posterior_param_lbl <- paste0(
-    "list(", 
-    "hat(a) == ", round(a, digits = 1), ", ", 
-    "hat(b) == ", round(b, digits = 1), ", ", 
-    "paste(E(mu) == frac(hat(a), hat(a) + hat(b)), {} == ", round(E_mu, digits = 5), ")", 
-    ")"
+  posterior_param_lbl <- sprintf(
+    fmt = "list(hat(a) == '%s', hat(b) == '%s', paste(E(mu) == frac(hat(a), hat(a) + hat(b)), {} == '%s'))", 
+    formatC(a,    digits = 1, format = "f"), 
+    formatC(b,    digits = 1, format = "f"), 
+    formatC(E_mu, digits = 5, format = "f")
   ) |> 
     parse(text = _)
   
@@ -576,11 +562,10 @@ for(i in 1:(N+1)) {
   )
   
   # 予測分布のラベルを作成
-  predict_param_lbl <- paste0(
-    "list(", 
-    "hat(mu)['*'] == ", round(mu_star, digits = 5), ", ", 
-    "paste(E(x) == hat(mu)['*'], {} == ", round(E_x, digits = 5), ")", 
-    ")"
+  predict_param_lbl <- sprintf(
+    fmt = "list(hat(mu)['*'] == '%s', paste(E(x) == hat(mu)['*'], {} == '%s'))", 
+    formatC(mu_star, digits = 5, format = "f"), 
+    formatC(E_x,     digits = 5, format = "f")
   ) |> 
     parse(text = _)
   
