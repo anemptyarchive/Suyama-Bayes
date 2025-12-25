@@ -1,170 +1,276 @@
 
-# 3.3.1 1次元ガウス分布の学習と予測：平均が未知の場合 ----------------------------------------------------
+# 1次元ガウスモデル ------------------------------------------------------------
+
+# chapter 3.3.1
+# 平均が未知の場合
+# ベイズ推論
+# 推論アルゴリズムの実装
+
+
+# パッケージの読込 -------------------------------------------------------------
 
 # 利用パッケージ
 library(tidyverse)
 library(gganimate)
 
-# チェック用
+# パッケージ名の省略用
 library(ggplot2)
 
 
-# ベイズ推論の実装 ----------------------------------------------------------------
+# ベイズ推論の実装 -------------------------------------------------------------
 
-### ・生成分布(ガウス分布)の設定 -----
+### 生成分布(ガウス分布)の設定 -----
 
-# 真の平均パラメータを指定
+#### パラメータの設定 -----
+
+# 真のパラメータを指定
 mu_truth <- 25
 
-# 既知の精度パラメータを指定
+# 既知のパラメータを指定
 lambda <- 0.01
-sqrt(1 / lambda) # 標準偏差
+1/sqrt(lambda) # 標準偏差
 
 
-# グラフ用のxの値を作成
-x_vec <- seq(
-  mu_truth - 1/sqrt(lambda) * 4, 
-  mu_truth + 1/sqrt(lambda) * 4, 
-  length.out = 501
-)
+#### 変数の設定 -----
 
-# 真の分布を計算:式(2.64)
+# x軸の範囲を設定
+u <- 5
+k <- 4
+x_size <- (1/sqrt(lambda)) |> # 基準値を指定
+  (\(.) {. * k})() |> # 定数倍
+  #(\(.) {max(., abs(x_n-mu_truth))})() |> # # サンプルと比較
+  (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
+x_min <- mu_truth - x_size
+x_max <- mu_truth + x_size
+
+# x軸の値を作成
+x_vec <- seq(from = x_min, to = x_max, by = 1)
+
+
+#### 分布の計算 -----
+
+# 生成分布の確率密度を計算
 model_df <- tibble::tibble(
-  x = x_vec, # 確率変数
-  dens = dnorm(x = x_vec, mean = mu_truth, sd = 1/sqrt(lambda)) # 確率密度
+  x      = x_vec, # 確率変数
+  mu     = mu_truth,       # 平均パラメータ
+  lambda = lambda,         # 精度パラメータ
+  sigma  = 1/sqrt(lambda), # 標準偏差パラメータ
+  dens   = dnorm(x = x, mean = mu, sd = sigma) # 確率密度
 )
 
-# 真の分布を作図
-ggplot() + 
-  geom_line(data = model_df, mapping = aes(x = x, y = dens, color = "model"), 
-            size = 1) + # 真の分布
-  scale_color_manual(breaks = "model", values = "purple", labels = "true model", name = "") + # 線の色:(凡例表示用)
-  labs(title = "Gaussian Distribution", 
-       subtitle = parse(text = paste0("list(mu==", mu_truth, ", lambda==", lambda, ")")), 
-       x = "x", y = "density")
+
+### 事前分布(ガウス分布)の設定 -----
+
+#### パラメータの設定 -----
+
+# 事前分布のパラメータを指定
+m         <- 0
+lambda_mu <- 0.001
 
 
-### ・データの生成 -----
+#### 変数の設定 -----
 
-# (観測)データ数を指定
+# μ軸の範囲を設定
+mu_min = x_min
+mu_max = x_max
+
+# μ軸の値を作成
+mu_vec <- seq(from = mu_min, to = mu_max, length.out = 1001)
+
+
+#### 分布の計算 -----
+
+# 事前分布の確率密度を計算
+prior_df <- tibble::tibble(
+  mu        = mu_vec, # 確率変数
+  m         = m,                 # 平均パラメータ
+  lambda_mu = lambda_mu,         # 精度パラメータ
+  sigma_mu  = 1/sqrt(lambda_mu), # 標準偏差パラメータ
+  dens      = dnorm(x = mu, mean = m, sd = sigma_mu) # 確率密度
+)
+
+
+### 観測データの生成 -----
+
+#### データの生成 -----
+
+# データ数を指定
 N <- 50
 
-
-# ガウス分布に従うデータを生成
+# 観測データを生成
 x_n <- rnorm(n = N, mean = mu_truth, sd = 1/sqrt(lambda))
 
-# 観測データを格納
-data_df <- tibble::tibble(x = x_n)
 
-# 観測データのヒストグラムを作成
-ggplot() + 
-  geom_histogram(data = data_df, aes(x = x, y = ..density.., fill = "data"), 
-                 bins = 30) + # 観測データ(密度)
-  geom_line(data = model_df, mapping = aes(x = x, y = dens, color = "model"), 
-            size = 1, linetype = "dashed") + # 真の分布
-  scale_fill_manual(values = c(model = NA, data = "pink"), na.value = NA, 
-                    labels = c(model = "true model", data = "observation data"), name = "") + # バーの色:(凡例表示用)
-  scale_color_manual(values = c(model = "red", data = "pink"), 
-                     labels = c(model = "true model", data = "observation data"), name = "") + # 線の色:(凡例表示用)
-  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c("dashed", "blank")))) + # 凡例の体裁:(凡例表示用)
-  labs(title = "Gaussian Distribution", 
-       subtitle = parse(text = paste0("list(mu==", mu_truth, ", lambda==", lambda, ", N==", N, ")")), 
-       x = "x", y = "density")
+### データの集計 -----
 
+# 階級数を指定
+bin_num <- 40
 
-### ・事前分布(ガウス分布)の設定 -----
+# 階級幅を計算
+bin_size <- (x_max - x_min) / bin_num
 
-# μの事前分布の平均パラメータを指定
-m <- 0
+# 境界値の範囲を設定
+bin_min <- x_min - 0.5*bin_size
+bin_max <- x_max + 0.5*bin_size
 
-# μの事前分布の精度パラメータを指定
-lambda_mu <- 0.0016
-sqrt(1 / lambda_mu) # 標準偏差
-
-
-# グラフ用のμの値を作成
-mu_vec <- seq(
-  mu_truth - 1/sqrt(lambda_mu) * 4, 
-  mu_truth + 1/sqrt(lambda_mu) * 4, 
-  length.out = 501
-)
-
-# μの事前分布を計算:式(2.64)
-prior_df <- tibble::tibble(
-  mu = mu_vec, # 確率変数
-  dens = dnorm(x = mu_vec, mean = m, sd = 1/sqrt(lambda_mu)) # 確率密度
-)
-
-# μの事前分布を作図
-ggplot() + 
-  geom_vline(mapping = aes(xintercept = mu_truth, color = "param"), 
-             size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
-  geom_line(data = prior_df, mapping = aes(x = mu, y = dens, color = "prior"), 
-            size = 1) + # μの事前分布
-  scale_color_manual(values = c(param = "red", prior = "purple"), 
-                     labels = c(param = "true parameter", prior = "prior"), name = "") + # 線の色:(凡例表示用)
-  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c("dashed", "solid")))) + # 凡例の体裁:(凡例表示用)
-  labs(title = "Gaussian Distribution", 
-       subtitle = parse(text = paste0("list(m==", m, ", lambda[mu]==", lambda_mu, ")")), 
-       x = expression(mu), y = "density")
+# 観測データを集計
+obs_df <- tibble::tibble(
+  x = x_n # サンプル値
+) |> 
+  dplyr::mutate(
+    bin_i  = (x - bin_min) %/% bin_size,        # 階級番号
+    center = bin_min + (bin_i + 0.5) * bin_size # 階級値
+  ) |> 
+  dplyr::count(
+    center, name = "freq" # 度数
+  ) |> 
+  dplyr::mutate(
+    dens = freq / (bin_size * N) # 密度
+  ) |> 
+  tidyr::complete(
+    center = seq(from = x_min, to = x_max, by = bin_size), 
+    fill = list(freq = 0, dens = 0)
+  ) # 未観測値を補完
 
 
-### ・事後分布(ガウス分布)の計算 -----
+### 事後分布(ガウス分布)の計算 -----
 
-# μの事後分布のパラメータを計算:式(3.53),(3.54)
+#### パラメータの計算 -----
+
+# 事後分布のパラメータを計算:式(3.53, 3.54)
 lambda_mu_hat <- N * lambda + lambda_mu
-m_hat         <- (lambda * sum(x_n) + lambda_mu * m) / lambda_mu_hat
+m_hat         <- (sum(x_n) * lambda + m * lambda_mu) / lambda_mu_hat
 
 
-# μの事後分布を計算:式(2.64)
+#### 分布の計算 -----
+
+# 事後分布の確率密度を計算
 posterior_df <- tibble::tibble(
-  mu = mu_vec, # 確率変数
-  dens = dnorm(x = mu_vec, mean = m_hat, sd = 1/sqrt(lambda_mu_hat)) # 確率密度
+  mu        = mu_vec, # 確率変数
+  m         = m_hat,             # 平均パラメータ
+  lambda_mu = lambda_mu_hat,     # 精度パラメータ
+  sigma_mu  = 1/sqrt(lambda_mu), # 標準偏差パラメータ
+  dens      = dnorm(x = mu, mean = m, sd = sigma_mu) # 確率密度
 )
 
-# μの事後分布を作図
+
+#### 分布の作図 -----
+
+# 事後分布のラベルを作成
+posterior_param_lbl <- paste0(
+  "list(", 
+  "N == ",               N, ", ", 
+  "mu[truth] == ",       round(mu_truth,      digits = 2), ", ", 
+  "hat(m) == ",          round(m_hat,         digits = 2), ", ", 
+  "hat(lambda)[mu] == ", round(lambda_mu_hat, digits = 5), 
+  ")"
+) |> 
+  parse(text = _)
+
+# 事後分布を作図
 ggplot() + 
-  geom_vline(aes(xintercept = mu_truth, color = "param"), 
-             size = 1, linetype = "dashed", show.legend = FALSE) + # 真のパラメータ
-  geom_line(data = posterior_df, mapping = aes(x = mu, y = dens, color = "posterior"), 
-            size = 1) + # μの事後分布
-  scale_color_manual(values = c(param = "red", posterior = "purple"), 
-                     labels = c(param = "true parameter", posterior = "posterior"), name = "") + # 線の色:(凡例表示用)
-  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c("dashed", "solid")))) + # 凡例の体裁:(凡例表示用)
-  labs(title = "Gaussian Distribution", 
-       subtitle = parse(
-         text = paste0("list(N==", N, ", hat(m)==", round(m_hat, 2), ", hat(lambda)[mu]==", round(lambda_mu_hat, 5), ")")
-       ), 
-       x = expression(mu), y = "density")
+  geom_vline(
+    mapping = aes(xintercept = mu_truth, color = "model"), 
+    linewidth = 1, linetype = "dashed"
+  ) + # 真のパラメータ
+  geom_line(
+    data    = prior_df, 
+    mapping = aes(x = mu, y = dens, color = "prior"), 
+    linewidth = 1, linetype = "dotted"
+  ) + # 事前分布
+  geom_line(
+    data    = posterior_df, 
+    mapping = aes(x = mu, y = dens, color = "posterior"), 
+    linewidth = 1
+  ) + # 事後分布
+  scale_x_continuous(
+    sec.axis = sec_axis(
+      transform = ~ ., 
+      breaks    = mu_truth, 
+      labels    = expression(mu[truth])
+    ) # パラメータラベル
+  ) + 
+  scale_color_manual(
+    breaks = c("model", "prior", "posterior"), 
+    values = c("red", "purple", "purple"), 
+    labels = c("true parameter", "prior distribution", "posterior distribution"), 
+    name = ""
+  ) + # (凡例表示用)
+  guides(
+    color = guide_legend(override.aes = list(linewidth = 0.5))
+  ) + 
+  labs(
+    title = "Gaussian distribution", 
+    subtitle = posterior_param_lbl, 
+    x = expression(mu), 
+    y = "density"
+  )
 
 
-### ・予測分布(ガウス分布)を計算 -----
+### 予測分布(ガウス分布)を計算 -----
+
+#### パラメータの計算 -----
 
 # 予測分布のパラメータを計算:式(3.62')
-lambda_star_hat <- lambda * lambda_mu_hat / (lambda + lambda_mu_hat)
 mu_star_hat     <- m_hat
-#lambda_star_hat <- (N * lambda + lambda_mu) * lambda / ((N + 1) * lambda + lambda_mu)
-#mu_star_hat     <- (lambda * sum(x_n) + lambda_mu * m) / (N * lambda + lambda_mu)
+lambda_star_hat <- lambda * lambda_mu_hat / (lambda + lambda_mu_hat)
 
-# 予測分布を計算:式(2.64)
+mu_star_hat     <- (lambda * sum(x_n) + m * lambda_mu) / (N * lambda + lambda_mu)
+lambda_star_hat <- (N * lambda + lambda_mu) * lambda / ((N+1) * lambda + lambda_mu)
+
+
+#### 分布の計算 -----
+
+# 予測分布の確率密度を計算
 predict_df <- tibble::tibble(
-  x = x_vec, # 確率変数
-  dens = dnorm(x = x_vec, mean = mu_star_hat, sd = 1/sqrt(lambda_star_hat)) # 確率密度
+  x           = x_vec, # 確率変数
+  mu_star     = mu_star_hat,         # 平均パラメータ
+  lambda_star = lambda_star_hat,     # 精度パラメータ
+  sigma_star  = 1/sqrt(lambda_star), # 標準偏差パラメータ
+  dens        = dnorm(x = x, mean = mu_star, sd = sigma_star) # 確率密度
 )
+
+
+#### 分布の作図 -----
+
+# 予測分布のラベルを作成
+predict_param_lbl <- paste0(
+  "list(", 
+  "N == ",                N, ", ", 
+  "mu[truth] == ",        round(mu_truth,        digits = 2), ", ", 
+  "lambda == ",           round(lambda,          digits = 5), ", ", 
+  "hat(mu)['*'] == ",     round(mu_star_hat,     digits = 2), ", ", 
+  "hat(lambda)['*'] == ", round(lambda_star_hat, digits = 5), 
+  ")"
+) |> 
+  parse(text = _)
 
 # 予測分布を作図
 ggplot() + 
-  geom_line(data = model_df, mapping = aes(x = x, y = dens, color = "model"), 
-            size = 1, linetype = "dashed") + # 真の分布
-  geom_line(data = predict_df, mapping = aes(x = x, y = dens, color = "predict"), 
-            size = 1) + # 予測分布
-  scale_color_manual(values = c(model = "red", predict = "purple"), 
-                     labels = c(model = "true model", predict = "predict"), name = "") + # 線の色:(凡例表示用)
-  guides(color = guide_legend(override.aes = list(size = c(0.5, 0.5), linetype = c("dashed", "solid")))) + # 凡例の体裁:(凡例表示用)
-  labs(title = "Gaussian Distribution", 
-       subtitle = parse(
-         text = paste0("list(N==", N, ", hat(mu)[s]==", round(mu_star_hat, 2), ", hat(lambda)[s]==", round(lambda_star_hat, 5), ")")
-       ), 
-       x = "x", y = "density")
+  geom_line(
+    data    = model_df, 
+    mapping = aes(x = x, y = dens, color = "model"), 
+    linewidth = 1, linetype = "dashed"
+  ) + # 真の分布
+  geom_line(
+    data    = predict_df, 
+    mapping = aes(x = x, y = dens, color = "predict"), 
+    linewidth = 1
+  ) + # 予測分布
+  scale_color_manual(
+    breaks = c("model", "predict"), 
+    values = c("red", "purple"), 
+    labels = c("true model", "predict distribution"), 
+    name   = ""
+  ) + # (凡例表示用)
+  guides(
+    color = guide_legend(override.aes = list(linewidth = 0.5))
+  ) + 
+  labs(
+    title = "Gaussian distribution", 
+    subtitle = predict_param_lbl, 
+    x = expression(x), 
+    y = "density"
+  )
 
 
