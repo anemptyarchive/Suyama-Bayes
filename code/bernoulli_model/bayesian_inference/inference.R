@@ -69,8 +69,8 @@ mu_vec <- seq(from = mu_min, to = mu_max, length.out = 1001)
 # 事前分布の確率密度を計算
 prior_df <- tibble::tibble(
   mu   = mu_vec, # 確率変数
-  a    = a, # パラメータ
-  b    = b, # パラメータ
+  a    = a, # 形状パラメータ
+  b    = b, # 形状パラメータ
   dens = dbeta(x = mu, shape1 = a, shape2 = b) # 確率密度
 )
 
@@ -123,10 +123,10 @@ posterior_param_lbl <- paste0(
   "list(", 
   "N == ",         N, ", ", 
   "mu[truth] == ", round(mu_truth, digits = 2), ", ", 
-  "a == ",         round(a, digits = 1), ", ", 
-  "b == ",         round(b, digits = 1), ", ", 
-  "hat(a) == ",    round(a_hat, digits = 1), ", ", 
-  "hat(b) == ",    round(b_hat, digits = 1), 
+  "a == ",         round(a,        digits = 1), ", ", 
+  "b == ",         round(b,        digits = 1), ", ", 
+  "hat(a) == ",    round(a_hat,    digits = 1), ", ", 
+  "hat(b) == ",    round(b_hat,    digits = 1), 
   ")"
 ) |> 
   parse(text = _)
@@ -161,7 +161,7 @@ ggplot() +
     name = ""
   ) + # (凡例表示用)
   guides(
-    color = guide_legend(override.aes = list(linewidth = 0.5)), 
+    color = guide_legend(override.aes = list(linewidth = 0.5))
   ) + 
   labs(
     title = "Beta distribution", 
@@ -177,7 +177,8 @@ ggplot() +
 
 # 予測分布のパラメータを計算:式(3.19')
 mu_star_hat <- a_hat / (a_hat + b_hat)
-#mu_star_hat <- (sum(x_n) + a) / (N + a + b)
+
+mu_star_hat <- (sum(x_n) + a) / (N + a + b)
 
 
 #### 分布の計算 -----
@@ -196,7 +197,7 @@ predict_df <- tibble::tibble(
 predict_param_lbl <- paste0(
   "list(", 
   "N == ",            N, ", ", 
-  "mu[truth] == ",    round(mu_truth, digits = 2), ", ", 
+  "mu[truth] == ",    round(mu_truth,    digits = 2), ", ", 
   "hat(mu)['*'] == ", round(mu_star_hat, digits = 1), 
   ")"
 ) |> 
@@ -224,7 +225,7 @@ ggplot() +
     name   = ""
   ) + # (凡例表示用)
   guides(
-    color = guide_legend(override.aes = list(linewidth = 0.5)), 
+    color = guide_legend(override.aes = list(linewidth = 0.5))
   ) + 
   labs(
     title = "Bernoulli distribution", 

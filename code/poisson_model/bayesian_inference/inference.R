@@ -28,10 +28,10 @@ lambda_truth <- 4
 #### 変数の設定 -----
 
 # x軸の範囲を設定
-u <- 5
 k <- 3
+u <- 5
 x_min <- 0
-x_max <- lambda_truth |> # 基準値を指定
+x_max <- lambda_truth |> # 期待値
   (\(.) {. * k})() |> # 定数倍
   #(\(.) {max(., x_n)})() |> # # サンプルと比較
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
@@ -62,10 +62,10 @@ b <- 1
 #### 変数の設定 -----
 
 # λ軸の範囲を設定
-u <- 5
 k <- 3
+u <- 5
 lambda_min <- 0
-lambda_max <- lambda_truth |> # 基準値を指定
+lambda_max <- lambda_truth |> # 真のパラメータ
   (\(.) {. * k})() |> # 定数倍
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
 
@@ -140,10 +140,10 @@ posterior_param_lbl <- paste0(
   "list(", 
   "N == ",             N, ", ", 
   "lambda[truth] == ", round(lambda_truth, digits = 2), ", ", 
-  "a == ",             round(a, digits = 1), ", ", 
-  "b == ",             round(b, digits = 1), ", ", 
-  "hat(a) == ",        round(a_hat, digits = 1), ", ", 
-  "hat(b) == ",        round(b_hat, digits = 1), 
+  "a == ",             round(a,            digits = 1), ", ", 
+  "b == ",             round(b,            digits = 1), ", ", 
+  "hat(a) == ",        round(a_hat,        digits = 1), ", ", 
+  "hat(b) == ",        round(b_hat,        digits = 1), 
   ")"
 ) |> 
   parse(text = _)
@@ -178,7 +178,7 @@ ggplot() +
     name = ""
   ) + # (凡例表示用)
   guides(
-    color = guide_legend(override.aes = list(linewidth = 0.5)), 
+    color = guide_legend(override.aes = list(linewidth = 0.5))
   ) + 
   labs(
     title = "Gamma distribution", 
@@ -196,10 +196,12 @@ ggplot() +
 r_hat <- a_hat
 q_hat <- 1 / (1 + b_hat)
 p_hat <- b_hat / (1 + b_hat)
-#r_hat <- sum(x_n) + a
-#q_hat <- 1 / (1 + N + b)
-#p_hat <- (N + b) / (1 + N + b)
-#p_hat <- 1 - q_hat
+
+r_hat <- sum(x_n) + a
+q_hat <- 1 / (1 + N + b)
+p_hat <- (N + b) / (1 + N + b)
+
+p_hat <- 1 - q_hat
 
 
 #### 分布の計算 -----
@@ -220,8 +222,8 @@ predict_param_lbl <- paste0(
   "list(", 
   "N == ",             N, ", ", 
   "lambda[truth] == ", round(lambda_truth, digits = 2), ", ", 
-  "hat(r) == ",        round(r_hat, digits = 1), ", ", 
-  "hat(p) == ",        round(p_hat, digits = 5), 
+  "hat(r) == ",        round(r_hat,        digits = 1), ", ", 
+  "hat(p) == ",        round(p_hat,        digits = 5), 
   ")"
 ) |> 
   parse(text = _)
@@ -248,7 +250,7 @@ ggplot() +
     name   = ""
   ) + # (凡例表示用)
   guides(
-    color = guide_legend(override.aes = list(linewidth = 0.5)), 
+    color = guide_legend(override.aes = list(linewidth = 0.5))
   ) + 
   labs(
     title = "Negative Binomial distribution", 

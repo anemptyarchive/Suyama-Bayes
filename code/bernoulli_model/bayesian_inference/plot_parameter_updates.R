@@ -118,20 +118,23 @@ trace_mu_i <- trace_a_i / (trace_a_i + trace_b_i)
 
 #### 分布の計算 -----
 
-# 観測データを格納
+# サンプルデータを格納
 anim_sample_df <- tibble::tibble(
   n = 0:N,       # データ番号
   x = c(NA, x_n) # 観測値
 )
 
 # 生成分布の確率を計算
+model_df <- tibble::tibble(
+  x    = x_vec, # 確率変数
+  mu   = mu_truth, # 成功確率パラメータ
+  prob = dbinom(x = x, size = 1, prob = mu) # 確率
+)
+
+# 生成分布を複製
 anim_model_df <- tidyr::expand_grid(
   n = 0:N, # データ番号
-  tibble::tibble(
-    x    = x_vec, # 確率変数
-    mu   = mu_truth, # 成功確率パラメータ
-    prob = dbinom(x = x, size = 1, prob = mu) # 確率
-  )
+  model_df
 ) # 試行ごとに分布を複製
 
 # 事後分布の確率密度を計算
@@ -218,6 +221,11 @@ posterior_graph <- ggplot() +
     )
   ) + 
   theme(
+    legend.title           = element_text(size = 0), 
+    legend.position        = "inside", 
+    legend.position.inside = c(1, 1), 
+    legend.justification   = c(1, 1), 
+    legend.background      = element_rect(fill = alpha("white", alpha = 0.8)), 
     plot.subtitle = element_text(size = 50) # (パラメータラベル用の空行サイズ)
   ) + 
   coord_cartesian(
@@ -235,7 +243,9 @@ gganimate::animate(
   plot = posterior_graph, 
   nframes = N+1, fps = 10, 
   width = 9, height = 6, units = "in", res = 100, 
-  renderer = gganimate::av_renderer(file = "figure/bernoulli_model/parameter_updates/posterior.mp4")
+  renderer = gganimate::av_renderer(
+    file = "figure/bernoulli_model/parameter_updates/posterior.mp4"
+  )
 )
 
 
@@ -296,6 +306,11 @@ predict_graph <- ggplot() +
     )
   ) + 
   theme(
+    legend.title           = element_text(size = 0), 
+    legend.position        = "inside", 
+    legend.position.inside = c(1, 1), 
+    legend.justification   = c(1, 1), 
+    legend.background      = element_rect(fill = alpha("white", alpha = 0.8)), 
     plot.subtitle = element_text(size = 50) # (パラメータラベル用の空行サイズ)
   ) + 
   coord_cartesian(
@@ -312,8 +327,10 @@ predict_graph <- ggplot() +
 gganimate::animate(
   plot = predict_graph, 
   nframes = N+1, fps = 10, 
-  width = 9, height = 6, units = "in", res = 100, 
-  renderer = gganimate::av_renderer(file = "figure/bernoulli_model/parameter_updates/predict.mp4")
+  width = 8, height = 6, units = "in", res = 100, 
+  renderer = gganimate::av_renderer(
+    file = "figure/bernoulli_model/parameter_updates/predict.mp4"
+  )
 )
 
 
@@ -339,12 +356,22 @@ prob_max <- anim_predict_df |>
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
 prob_max
 
+
+# 第2軸の設定用のダミーを作成:(目盛の共通化用)
+dummy_graph <- ggplot() + 
+  geom_bar(data = model_df, mapping = aes(x = x, y = prob), stat = "identity", position = "identity") + # 真の分布
+  coord_cartesian(ylim = c(0, prob_max)) # (目盛の共通化用)
+dummy_built <- ggplot_build(dummy_graph) # 図情報を取得
+
+
 # 試行ごとに作図
-for(i in 1:(N+1)) {
+for(n in 0:N) {
+  
+  ##### パラメータの取得 -----
   
   # 値を取得
-  n       <- i - 1  # データ番号
-  x       <- x_n[n] # 観測値
+  i <- n + 1  # 試行インデックス
+  x <- x_n[n] # 観測値
   a       <- trace_a_i[i]  # 形状パラメータ
   b       <- trace_b_i[i]  # 形状パラメータ
   mu_star <- trace_mu_i[i] # 成功確率パラメータ
@@ -361,12 +388,6 @@ for(i in 1:(N+1)) {
   
   # 観測データの標本平均を計算
   bar_x = mean(x_n[0:n])
-  
-  # 生成分布の確率を計算
-  model_df <- tibble::tibble(
-    x    = x_vec, # 確率変数
-    prob = c(1-mu_truth, mu_truth) # 確率
-  )
   
   # 観測データを集計
   obs_df <- tibble::tibble(
@@ -385,18 +406,8 @@ for(i in 1:(N+1)) {
   ) |> 
     parse(text = _)
   
-  # (目盛の共通化用)
-  dummy_graph <- ggplot() + 
-    geom_bar(
-      data    = model_df, 
-      mapping = aes(x = x, y = prob), 
-      stat = "identity", position = "identity"
-    ) + # 真の分布
-    coord_cartesian(
-      ylim = c(0, prob_max) # (目盛の共通化用)
-    )
-  built     <- ggplot_build(dummy_graph) # 図情報を取得
-  prob_vals <- built$layout$panel_params[[1]]$y$breaks         # 確率軸目盛を取得
+  # 軸目盛を設定:(目盛の共通化用)
+  prob_vals <- dummy_built$layout$panel_params[[1]]$y$breaks   # 確率軸目盛を取得
   freq_vals <- prob_vals * ifelse(test = n>0, yes = n, no = 1) # 度数軸目盛に変換
   
   # 観測データを作図
@@ -412,7 +423,7 @@ for(i in 1:(N+1)) {
     geom_bar(
       data    = model_df, 
       mapping = aes(x = x, y = prob, color = "model"), 
-      stat = "identity", position = "identity",
+      stat = "identity", position = "identity", 
       fill = NA, linewidth = 1, linetype = "dashed"
     ) + # 真の分布
     geom_bar(
@@ -427,7 +438,7 @@ for(i in 1:(N+1)) {
       color = "hotpink", size = 5
     ) + # 観測データ
     scale_x_continuous(
-      breaks = x_vec, minor_breaks = FALSE, 
+      breaks = x_vec, minor_breaks = FALSE, # x軸目盛
       sec.axis = sec_axis(
         transform = ~ ., 
         breaks    = c(E_x, bar_x), 
@@ -437,12 +448,12 @@ for(i in 1:(N+1)) {
     scale_y_continuous(
       breaks = prob_vals, # (目盛の共通化用)
       sec.axis = sec_axis(
-        transform = ~ .*ifelse(test = n>0, yes = n, no = 1), 
+        transform = ~ . * ifelse(test = n>0, yes = n, no = 1), 
         breaks    = freq_vals, # (目盛の共通化用)
         labels    = scales::label_number(accuracy = 0.01), # (描画領域のズレの対策用)
         name      = "frequency"
-      )
-    ) + # 度数軸目盛
+      ) # 度数軸目盛
+    ) + 
     scale_color_manual(
       breaks = c("model", "sample"), 
       values = c("red", NA), 
@@ -466,7 +477,7 @@ for(i in 1:(N+1)) {
     ) + 
     coord_cartesian(
       xlim = c(x_min-0.5, x_max+0.5), # (目盛の共通化用)
-      ylim = c(0, prob_max) # (目盛の共通化用)
+      ylim = c(0, prob_max)           # (目盛の共通化用)
     ) + 
     labs(
       title = "Bernoulli distribution", 
@@ -480,7 +491,7 @@ for(i in 1:(N+1)) {
   # 事後分布の期待値を計算
   E_mu <- a / (a + b)
   
-  # 事後分布の確率を計算
+  # 事後分布の確率密度を計算
   posterior_df <- tibble::tibble(
     mu   = mu_vec, # 確率変数
     dens = dbeta(x = mu, shape1 = a, shape2 = b) # 確率密度
@@ -541,7 +552,7 @@ for(i in 1:(N+1)) {
     ) + 
     coord_cartesian(
       xlim = c(x_min-0.5, x_max+0.5), # (目盛の共通化用)
-      ylim = c(0, dens_max)
+      ylim = c(0, dens_max)           # 表示範囲を固定
     ) + 
     labs(
       title = "Beta distribution", 
@@ -582,7 +593,7 @@ for(i in 1:(N+1)) {
     geom_bar(
       data    = model_df, 
       mapping = aes(x = x, y = prob, color = "model"), 
-      stat = "identity", position = "identity",
+      stat = "identity", position = "identity", 
       fill = NA, linewidth = 1, linetype = "dashed"
     ) + # 真の分布
     geom_bar(
@@ -597,7 +608,7 @@ for(i in 1:(N+1)) {
       color = "hotpink", size = 5
     ) + # 観測データ
     scale_x_continuous(
-      breaks = x_vec, minor_breaks = FALSE, 
+      breaks = x_vec, minor_breaks = FALSE, # x軸目盛
       sec.axis = sec_axis(
         transform = ~ ., 
         breaks    = c(mu_truth, E_x), 
@@ -627,7 +638,7 @@ for(i in 1:(N+1)) {
     ) + 
     coord_cartesian(
       xlim = c(x_min-0.5, x_max+0.5), # (目盛の共通化用)
-      ylim = c(0, prob_max)
+      ylim = c(0, prob_max)           # 表示範囲を固定
     ) + 
     labs(
       title = "Negative Binomial distribution", 
@@ -673,10 +684,16 @@ for(i in 1:(N+1)) {
   message("\r", n, " / ", N, appendLF = FALSE)
 }
 
+
+##### アニメーションの変換 -----
+
 # 動画を作成
 paste0(dir_path, "/", stringr::str_pad(0:N, width = nchar(N), pad = "0"), ".png") |> # ファイルパスを作成
   magick::image_read() |> # pngファイルを読込
   magick::image_animate(fps = 1, dispose = "previous") |> # gifファイルを作成
-  magick::image_write_video(path = "figure/bernoulli_model/parameter_updates/observation.mp4", framerate = 10) -> tmp_path # mp4ファイルを書出
+  magick::image_write_video(
+    path = "figure/bernoulli_model/parameter_updates/observation.mp4", 
+    framerate = 10
+  ) -> tmp_path # mp4ファイルを書出
 
 

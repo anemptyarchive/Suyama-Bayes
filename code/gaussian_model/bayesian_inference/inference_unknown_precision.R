@@ -29,15 +29,15 @@ mu <- 5
 
 # 真のパラメータを指定
 lambda_truth <- 0.25
-1/sqrt(lambda_truth)
+1/sqrt(lambda_truth) # 標準偏差
 
 
 #### 変数の設定 -----
 
 # x軸の範囲を設定
-u <- 5
 k <- 4
-x_size <- (1/sqrt(lambda_truth)) |> # 基準値を指定
+u <- 5
+x_size <- (1/sqrt(lambda_truth)) |> # 標準偏差
   (\(.) {. * k})() |> # 定数倍
   #(\(.) {max(., abs(x_n-mu))})() |> # # サンプルと比較
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
@@ -72,10 +72,10 @@ b <- 1
 #### 変数の設定 -----
 
 # λ軸の範囲を設定
-u <- 0.5
 k <- 3
+u <- 0.5
 lambda_min <- 0
-lambda_max <- lambda_truth |> # 基準値を指定
+lambda_max <- lambda_truth |> # 真のパラメータ
   (\(.) {. * k})() |> # 定数倍
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
 

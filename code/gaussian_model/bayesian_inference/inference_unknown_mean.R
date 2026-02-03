@@ -34,11 +34,11 @@ lambda <- 0.01
 #### 変数の設定 -----
 
 # x軸の範囲を設定
-u <- 5
 k <- 4
-x_size <- (1/sqrt(lambda)) |> # 基準値を指定
+u <- 5
+x_size <- (1/sqrt(lambda)) |> # 標準偏差
   (\(.) {. * k})() |> # 定数倍
-  #(\(.) {max(., abs(x_n-mu_truth))})() |> # # サンプルと比較
+  #(\(.) {max(., abs(x_n-mu_truth))})() |> # サンプルと比較
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
 x_min <- mu_truth - x_size
 x_max <- mu_truth + x_size
@@ -71,8 +71,8 @@ lambda_mu <- 0.001
 #### 変数の設定 -----
 
 # μ軸の範囲を設定
-mu_min = x_min
-mu_max = x_max
+mu_min <- x_min
+mu_max <- x_max
 
 # μ軸の値を作成
 mu_vec <- seq(from = mu_min, to = mu_max, length.out = 1001)
