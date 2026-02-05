@@ -18,13 +18,13 @@ library(ggplot2)
 
 # ベイズ推論の可視化 -----------------------------------------------------------
 
-### 生成分布(ポアソン分布)の設定 -----
+### 生成分布の設定 -----
 
 # 真のパラメータを指定
 lambda_truth <- 4
 
 
-### 観測データの設定 -----
+### 観測データの生成 -----
 
 # シードを設定:(ノートとの対応用)
 set.seed(86)
@@ -46,7 +46,7 @@ x_max <- lambda_truth |> # 期待値
   (\(.) {. * k})() |> # 定数倍
   (\(.) {max(., x_n)})() |> # # サンプルと比較
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
-cat('x size:', x_min, x_max)
+cat("x size:", x_min, x_max)
 
 # x軸の値を作成
 x_vec <- seq(from = x_min, to = x_max, by = 1)
@@ -55,7 +55,7 @@ x_vec <- seq(from = x_min, to = x_max, by = 1)
 # λ軸の範囲を設定
 lambda_min <- x_min # (固定)
 lambda_max <- x_max # (固定)
-cat('λ size:', lambda_min, lambda_max)
+cat("λ size:", lambda_min, lambda_max)
 
 # λ軸の値を作成
 lambda_vec <- seq(from = lambda_min, to = lambda_max, length.out = 1001)
@@ -131,16 +131,14 @@ trace_q_i <- 1 / (1 + 0:N + b)
 trace_p_i <- (0:N + b) / (1 + 0:N + b)
 
 
-### 推移の作図 -----
-
-
-#### 分布の計算 -----
+### 分布の計算 -----
 
 # サンプルデータを格納
 anim_sample_df <- tibble::tibble(
   n = 0:N,       # データ番号
   x = c(NA, x_n) # 観測値
 )
+
 
 # 生成分布の確率を計算
 model_df <- tibble::tibble(
@@ -154,6 +152,7 @@ anim_model_df <- tidyr::expand_grid(
   n = 0:N, # データ番号
   model_df
 ) # 試行ごとに分布を複製
+
 
 # 事後分布の確率密度を計算
 anim_posterior_df <- tidyr::expand_grid(
@@ -178,21 +177,25 @@ anim_predict_df <- tidyr::expand_grid(
   )
 
 
+### 推移の作図 -----
+
 #### 事後分布の作図 -----
 
 # 事後分布のラベルを作成
 anim_param_df <- tibble::tibble(
   n = 0:N, 
   a = trace_a_i, 
-  b = trace_b_i, 
-  posterior_param_lbl = sprintf(
-    fmt = "list(N == '%s', lambda[truth] == '%s', hat(a) == '%s', hat(b) == '%s')", 
-    formatC(n,            digits = 0, format = "d"), 
-    formatC(lambda_truth, digits = 2, format = "f"), 
-    formatC(a,            digits = 1, format = "f"), 
-    formatC(b,            digits = 1, format = "f")
+  b = trace_b_i
+) |> 
+  dplyr::mutate(
+    posterior_param_lbl = sprintf(
+      fmt = "list(N == '%s', lambda[truth] == '%s', hat(a) == '%s', hat(b) == '%s')", 
+      formatC(n,            digits = 0, format = "d"), 
+      formatC(lambda_truth, digits = 2, format = "f"), 
+      formatC(a,            digits = 1, format = "f"), 
+      formatC(b,            digits = 1, format = "f")
+    )
   )
-)
 
 # 事後分布を作図
 posterior_graph <- ggplot() + 
@@ -274,15 +277,17 @@ gganimate::animate(
 anim_param_df <- tibble::tibble(
   n = 0:N, 
   r = trace_r_i, 
-  p = trace_p_i, 
-  predict_param_lbl = sprintf(
-    fmt = "list(N == '%s', lambda[truth] == '%s', hat(r) == '%s', hat(p) == '%s')", 
-    formatC(n,            digits = 0, format = "d"), 
-    formatC(lambda_truth, digits = 2, format = "f"), 
-    formatC(r,            digits = 1, format = "f"), 
-    formatC(p,            digits = 5, format = "f")
+  p = trace_p_i
+) |> 
+  dplyr::mutate(
+    predict_param_lbl = sprintf(
+      fmt = "list(N == '%s', lambda[truth] == '%s', hat(r) == '%s', hat(p) == '%s')", 
+      formatC(n,            digits = 0, format = "d"), 
+      formatC(lambda_truth, digits = 2, format = "f"), 
+      formatC(r,            digits = 1, format = "f"), 
+      formatC(p,            digits = 5, format = "f")
+    )
   )
-)
 
 # 予測分布を作図
 predict_graph <- ggplot() + 

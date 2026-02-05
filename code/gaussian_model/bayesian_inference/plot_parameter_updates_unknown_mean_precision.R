@@ -11,8 +11,8 @@
 
 # 利用パッケージ
 library(tidyverse)
-library(gganimate)
 library(LaplacesDemon)
+library(gganimate)
 
 # パッケージの省略用
 library(ggplot2)
@@ -20,7 +20,7 @@ library(ggplot2)
 
 # ベイズ推論の可視化 -----------------------------------------------------------
 
-### 生成分布(ガウス分布)の設定 -----
+### 生成分布の設定 -----
 
 # 真のパラメータを指定
 mu_truth     <- 5
@@ -31,7 +31,7 @@ sigma_truth <- 1/sqrt(lambda_truth) # (処理の効率化用)
 sigma_truth
 
 
-### 観測データの設定 -----
+### 観測データの生成 -----
 
 # シードを設定:(ノートとの対応用)
 set.seed(86)
@@ -40,7 +40,7 @@ set.seed(86)
 N <- 100
 
 # 観測データを生成
-x_n <- rnorm(n = N, mean = mu_truth, sd = 1/sqrt(lambda_truth))
+x_n <- rnorm(n = N, mean = mu_truth, sd = sigma_truth)
 
 
 ### 変数の設定 -----
@@ -54,7 +54,7 @@ x_size <- sigma_truth |> # 標準偏差
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
 x_min <- mu_truth - x_size
 x_max <- mu_truth + x_size
-cat('x size:', x_min, x_max)
+cat("x size:", x_min, x_max)
 
 # x軸の値を作成
 x_vec <- seq(from = x_min, to = x_max, length.out = 101)
@@ -63,7 +63,7 @@ x_vec <- seq(from = x_min, to = x_max, length.out = 101)
 # μ軸の範囲を設定
 mu_min <- x_min # (固定)
 mu_max <- x_max # (固定)
-cat('μ size:', mu_min, mu_max)
+cat("μ size:", mu_min, mu_max)
 
 # μ軸の値を作成
 mu_vec <- seq(from = mu_min, to = mu_max, length.out = 101)
@@ -76,7 +76,7 @@ lambda_min <- 0
 lambda_max <- lambda_truth |> # 真のパラメータ
   (\(.) {. * k})() |> # 定数倍
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
-cat('λ size:', lambda_min, lambda_max)
+cat("λ size:", lambda_min, lambda_max)
 
 # λ軸の値を作成
 lambda_vec <- seq(from = lambda_min, to = lambda_max, length.out = 101)
@@ -85,6 +85,7 @@ lambda_vec <- seq(from = lambda_min, to = lambda_max, length.out = 101)
 # σ軸の範囲を設定
 sigma_min <- x_min - mu_truth # (固定)
 sigma_max <- x_max - mu_truth # (固定)
+cat("σ size:", sigma_min, sigma_max)
 
 # σ軸の値を作成
 sigma_vec <- seq(from = sigma_min, to = sigma_max, length.out = 1001)
@@ -102,7 +103,7 @@ b    <- 1
 
 # 予測分布のパラメータを計算:式(3.95)
 mu_s     <- m
-lambda_s <- beta * a / (1 + beta) / b
+lambda_s <- beta / (1 + beta) * a / b
 nu_s     <- 2 * a
 
 # 受け皿を初期化
@@ -141,7 +142,7 @@ for(n in 1:N){
   
   # 予測分布のパラメータを更新:式(3.95)
   mu_s     <- m
-  lambda_s <- beta * a / (1 + beta) / b
+  lambda_s <- beta / (1 + beta) * a / b
   nu_s     <- 2 * a
   
   # 更新値を記録
@@ -189,16 +190,13 @@ anime_param_df <- tibble::tibble(
   dplyr::select(!c(sum_x, sum_x2)) # 不要な列を削除
 
 
-
-### 推移の作図 -----
-
-#### 分布の計算 -----
+### 分布の計算 -----
 
 # サンプルデータを格納
 anim_sample_df <- tibble::tibble(
   n = 0:N,        # データ番号
   x = c(NA, x_n), # 観測値
-  z = (sigma_truth / (x - mu_truth))^2 # λ軸に対応する位置
+  z = (sigma_truth / (x - mu_truth))^2 # λ軸に対応する座標
 ) |> 
   dplyr::mutate(
     z = dplyr::if_else(
@@ -218,7 +216,7 @@ anim_data_df <- tibble::tibble(
   ) |> 
   dplyr::mutate(
     x = x_n[n], # 観測値
-    z = (sigma_truth / (x - mu_truth))^2 # λ軸に対応する位置
+    z = (sigma_truth / (x - mu_truth))^2 # λ軸に対応する座標
   ) |> 
   dplyr::mutate(
     z = dplyr::if_else(
@@ -230,8 +228,9 @@ anim_data_df <- tibble::tibble(
   tidyr::complete(
     i = 0:N, 
     fill = list(n = NA, x = NA, z = NA)
-  ) |> # 初回フレーム用の値を補完
+  ) |> # 初期値用のデータを補完
   dplyr::select(n = i, x, z)
+
 
 # 生成分布の確率密度を計算
 model_df <- tibble::tibble(
@@ -247,6 +246,7 @@ anim_model_df <- tidyr::expand_grid(
   n = 0:N, # データ番号
   model_df
 ) # 試行ごとに分布を複製
+
 
 # 事後分布の確率密度を計算
 anim_posterior_df <- tidyr::expand_grid(
@@ -280,6 +280,8 @@ anim_predict_df <- tidyr::expand_grid(
   )
 
 
+### 推移の作図 -----
+
 #### 事後分布の作図 -----
 
 # 事後分布のラベルを作成
@@ -288,23 +290,25 @@ anim_param_df <- tibble::tibble(
   m    = trace_m_i, 
   beta = trace_beta_i, 
   a    = trace_a_i, 
-  b    = trace_b_i, 
-  posterior_param_lbl = sprintf(
-    fmt = paste0(
-      "list(", 
-      "N == '%s', mu[truth] == %s, lambda[truth] == %s, ", 
-      "hat(m) == '%s', hat(beta) == '%s', hat(a) == '%s', hat(b) == '%s'", 
-      ")"
-    ), 
-    formatC(n,            digits = 0, format = "d"), 
-    formatC(mu_truth,     digits = 2, format = "f"), 
-    formatC(lambda_truth, digits = 5, format = "f"), 
-    formatC(m,            digits = 2, format = "f"), 
-    formatC(beta,         digits = 1, format = "f"), 
-    formatC(a,            digits = 1, format = "f"), 
-    formatC(b,            digits = 1, format = "f")
+  b    = trace_b_i
+) |> 
+  dplyr::mutate(
+    posterior_param_lbl = sprintf(
+      fmt = paste0(
+        "list(", 
+        "N == '%s', mu[truth] == %s, lambda[truth] == %s, ", 
+        "hat(m) == '%s', hat(beta) == '%s', hat(a) == '%s', hat(b) == '%s'", 
+        ")"
+      ), 
+      formatC(n,            digits = 0, format = "d"), 
+      formatC(mu_truth,     digits = 2, format = "f"), 
+      formatC(lambda_truth, digits = 5, format = "f"), 
+      formatC(m,            digits = 2, format = "f"), 
+      formatC(beta,         digits = 1, format = "f"), 
+      formatC(a,            digits = 1, format = "f"), 
+      formatC(b,            digits = 1, format = "f")
+    )
   )
-)
 
 # 事後分布を作図
 posterior_graph <- ggplot() + 
@@ -397,22 +401,24 @@ anim_param_df <- tibble::tibble(
   n        = 0:N, 
   mu_s     = trace_mu_s_i, 
   lambda_s = trace_lambda_s_i, 
-  nu_s     = trace_nu_s_i, 
-  predict_param_lbl = sprintf(
-    fmt = paste0(
-      "list(", 
-      "N == '%s', mu[truth] == %s, lambda[truth] == %s, ", 
-      "hat(mu)[s] == '%s', hat(lambda)[s] == '%s', hat(nu)[s] == '%s'", 
-      ")"
-    ), 
-    formatC(n,            digits = 0, format = "d"), 
-    formatC(mu_truth,     digits = 2, format = "f"), 
-    formatC(lambda_truth, digits = 5, format = "f"), 
-    formatC(mu_s,         digits = 2, format = "f"), 
-    formatC(lambda_s,     digits = 5, format = "f"), 
-    formatC(nu_s,         digits = 1, format = "f")
+  nu_s     = trace_nu_s_i
+) |> 
+  dplyr::mutate(
+    predict_param_lbl = sprintf(
+      fmt = paste0(
+        "list(", 
+        "N == '%s', mu[truth] == %s, lambda[truth] == %s, ", 
+        "hat(mu)[s] == '%s', hat(lambda)[s] == '%s', hat(nu)[s] == '%s'", 
+        ")"
+      ), 
+      formatC(n,            digits = 0, format = "d"), 
+      formatC(mu_truth,     digits = 2, format = "f"), 
+      formatC(lambda_truth, digits = 5, format = "f"), 
+      formatC(mu_s,         digits = 2, format = "f"), 
+      formatC(lambda_s,     digits = 5, format = "f"), 
+      formatC(nu_s,         digits = 1, format = "f")
+    )
   )
-)
 
 # 予測分布を作図
 posterior_graph <- ggplot() + 
@@ -567,11 +573,11 @@ for(n in 0:N) {
   # 観測データを格納
   sample_df <- tibble::tibble(
     x = x, # 観測値
-    z = (sigma_truth / (x - mu_truth))^2 # λ軸に対応する位置
+    z = (sigma_truth / (x - mu_truth))^2 # λ軸に対応する座標
   )
   data_df <- tibble::tibble(
     x = x_n[0:n], # 観測値
-    z = (sigma_truth / (x - mu_truth))^2 # λ軸に対応する位置
+    z = (sigma_truth / (x - mu_truth))^2 # λ軸に対応する座標
   )
   
   ##### 軸変換の作図：(σ to σ) -----
@@ -602,7 +608,7 @@ for(n in 0:N) {
     coord_cartesian(
       xlim = c(sigma_min, sigma_max), # (目盛の共通化用)
       ylim = c(sigma_min, sigma_max)  # (目盛の共通化用)
-    ) + # (軸の対応用)
+    ) + 
     labs(
       x = expression(sigma), 
       y = expression(sigma)
@@ -629,7 +635,7 @@ for(n in 0:N) {
     coord_cartesian(
       xlim = c(lambda_min, lambda_max), # (目盛の共通化用)
       ylim = c(sigma_min, sigma_max)    # (目盛の共通化用)
-    ) + # (軸の対応用)
+    ) + 
     labs(
       x = expression(lambda == frac(1, sigma^2)), 
       y = expression(sigma == frac(1, sqrt(lambda)))
@@ -641,7 +647,7 @@ for(n in 0:N) {
   E_x <- mu_truth
   
   # 観測データの標本平均を計算
-  bar_x = mean(x_n[0:n])
+  bar_x <- mean(x_n[0:n])
   
   # 観測データを集計
   obs_df <- data_df |> 
@@ -917,7 +923,7 @@ for(n in 0:N) {
     coord_cartesian(
       xlim = c(lambda_min, lambda_max), # (目盛の共通化用)
       ylim = c(lambda_min, lambda_max)  # (目盛の共通化用)
-    ) + # (軸の対応用)
+    ) + 
     labs(
       x = expression(lambda), 
       y = expression(lambda)
@@ -940,7 +946,7 @@ for(n in 0:N) {
   
   # 予測分布のラベルを作成
   predict_param_lbl <- sprintf(
-    fmt = "list(mu[s] == '%s', hat(lambda)[s] == '%s', hat(nu)[s] == '%s', paste(E(x) == mu[s], {} == '%s'))", 
+    fmt = "list(hat(mu)[s] == '%s', hat(lambda)[s] == '%s', hat(nu)[s] == '%s', paste(E(x) == hat(mu)[s], {} == '%s'))", 
     formatC(mu_s,     digits = 2, format = "f"), 
     formatC(lambda_s, digits = 3, format = "f"), 
     formatC(nu_s,     digits = 1, format = "f"), 
@@ -1092,7 +1098,7 @@ for(n in 0:N) {
     coord_cartesian(
       xlim = c(lambda_min, lambda_max), # (目盛の共通化用)
       ylim = c(0, predict_dens_max)     # (目盛の共通化用)
-    ) + # (軸の対応用)
+    ) + 
     labs(
       x = expression(lambda), 
       y = "density"

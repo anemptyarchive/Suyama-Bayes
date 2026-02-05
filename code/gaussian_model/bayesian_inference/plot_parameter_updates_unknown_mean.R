@@ -19,7 +19,7 @@ library(ggplot2)
 
 # ベイズ推論の可視化 -----------------------------------------------------------
 
-### 生成分布(ガウス分布)の設定 -----
+### 生成分布の設定 -----
 
 # 真のパラメータを指定
 mu_truth <- 25
@@ -29,7 +29,7 @@ lambda <- 0.01
 1/sqrt(lambda) # 標準偏差
 
 
-### 観測データの設定 -----
+### 観測データの生成 -----
 
 # シードを設定:(ノートとの対応用)
 set.seed(86)
@@ -52,7 +52,7 @@ x_size <- (1/sqrt(lambda)) |> # 標準偏差
   (\(.) {ceiling(. /u)*u})() # u単位で切り上げ
 x_min <- mu_truth - x_size
 x_max <- mu_truth + x_size
-cat('x size:', x_min, x_max)
+cat("x size:", x_min, x_max)
 
 # x軸の値を作成
 x_vec <- seq(from = x_min, to = x_max, length.out = 1001)
@@ -61,7 +61,7 @@ x_vec <- seq(from = x_min, to = x_max, length.out = 1001)
 # μ軸の範囲を設定
 mu_min <- x_min # (固定)
 mu_max <- x_max # (固定)
-cat('μ size:', mu_min, mu_max)
+cat("μ size:", mu_min, mu_max)
 
 # μ軸の値を作成
 mu_vec <- seq(from = mu_min, to = mu_max, length.out = 1001)
@@ -99,8 +99,8 @@ for(n in 1:N){
   
   # 事後分布のパラメータを更新:式(3.53, 3.54)
   lambda_mu_old <- lambda_mu
-  lambda_mu <- lambda_mu + lambda
-  m         <- (x_n[n] * lambda + m * lambda_mu_old) / lambda_mu
+  lambda_mu     <- lambda_mu + lambda
+  m             <- (x_n[n] * lambda + m * lambda_mu_old) / lambda_mu
   
   # 予測分布のパラメータを更新:式(3.62)
   mu_star     <- m
@@ -132,9 +132,7 @@ trace_mu_star_i     <- trace_m_i
 trace_lambda_star_i <- lambda * trace_lambda_mu_i / (lambda + trace_lambda_mu_i)
 
 
-### 推移の作図 -----
-
-#### 分布の計算 -----
+### 分布の計算 -----
 
 # サンプルデータを格納
 anim_sample_df <- tibble::tibble(
@@ -156,8 +154,9 @@ anim_data_df <- tibble::tibble(
   tidyr::complete(
     i = 0:N, 
     fill = list(n = NA, x = NA)
-  ) |> # 初回フレーム用の値を補完
+  ) |> # 初期値用のデータを補完
   dplyr::select(n = i, x)
+
 
 # 生成分布の確率密度を計算
 model_df <- tibble::tibble(
@@ -173,6 +172,7 @@ anim_model_df <- tidyr::expand_grid(
   n = 0:N, # データ番号
   model_df
 ) # 試行ごとに分布を複製
+
 
 # 事後分布の確率密度を計算
 anim_posterior_df <- tidyr::expand_grid(
@@ -199,21 +199,25 @@ anim_predict_df <- tidyr::expand_grid(
   )
 
 
+### 推移の作図 -----
+
 #### 事後分布の作図 -----
 
 # 事後分布のラベルを作成
 anim_param_df <- tibble::tibble(
   n         = 0:N, 
   m         = trace_m_i, 
-  lambda_mu = trace_lambda_mu_i, 
-  posterior_param_lbl = sprintf(
-    fmt = "list(N == '%s', mu[truth] == %s, hat(m) == '%s', hat(lambda)[mu] == '%s')", 
-    formatC(n,         digits = 0, format = "d"), 
-    formatC(mu_truth,  digits = 2, format = "f"), 
-    formatC(m,         digits = 2, format = "f"), 
-    formatC(lambda_mu, digits = 5, format = "f")
+  lambda_mu = trace_lambda_mu_i
+) |> 
+  dplyr::mutate(
+    posterior_param_lbl = sprintf(
+      fmt = "list(N == '%s', mu[truth] == %s, hat(m) == '%s', hat(lambda)[mu] == '%s')", 
+      formatC(n,         digits = 0, format = "d"), 
+      formatC(mu_truth,  digits = 2, format = "f"), 
+      formatC(m,         digits = 2, format = "f"), 
+      formatC(lambda_mu, digits = 5, format = "f")
+    )
   )
-)
 
 # 事後分布を作図
 posterior_graph <- ggplot() + 
@@ -301,16 +305,18 @@ gganimate::animate(
 anim_param_df <- tibble::tibble(
   n           = 0:N, 
   mu_star     = trace_mu_star_i, 
-  lambda_star = trace_lambda_star_i, 
-  predict_param_lbl = sprintf(
-    fmt = "list(N == '%s', mu[truth] == %s, lambda == %s, hat(mu)['*'] == '%s', hat(lambda)['*'] == '%s')", 
-    formatC(n,           digits = 0, format = "d"), 
-    formatC(mu_truth,    digits = 2, format = "f"), 
-    formatC(lambda,      digits = 5, format = "f"), 
-    formatC(mu_star,     digits = 2, format = "f"), 
-    formatC(lambda_star, digits = 5, format = "f")
+  lambda_star = trace_lambda_star_i
+) |> 
+  dplyr::mutate(
+    predict_param_lbl = sprintf(
+      fmt = "list(N == '%s', mu[truth] == %s, lambda == %s, hat(mu)['*'] == '%s', hat(lambda)['*'] == '%s')", 
+      formatC(n,           digits = 0, format = "d"), 
+      formatC(mu_truth,    digits = 2, format = "f"), 
+      formatC(lambda,      digits = 5, format = "f"), 
+      formatC(mu_star,     digits = 2, format = "f"), 
+      formatC(lambda_star, digits = 5, format = "f")
+    )
   )
-)
 
 # 予測分布を作図
 posterior_graph <- ggplot() + 
@@ -454,7 +460,7 @@ for(n in 0:N) {
   E_x <- mu_truth
   
   # 観測データの標本平均を計算
-  bar_x = mean(x_n[0:n])
+  bar_x <- mean(x_n[0:n])
   
   # 観測データを集計
   obs_df <- data_df |> 
@@ -485,7 +491,7 @@ for(n in 0:N) {
     parse(text = _)
   
   # 軸目盛を設定:(目盛の共通化用)
-  dens_vals <- dummy_built$layout$panel_params[[1]]$y$breaks              # 確率密度軸目盛を取得
+  dens_vals <- dummy_built$layout$panel_params[[1]]$y$breaks            # 確率密度軸目盛を取得
   freq_vals <- dens_vals * ifelse(test = n>0, yes = bin_size*n, no = 1) # 度数軸目盛に変換
   
   # 観測データを作図
