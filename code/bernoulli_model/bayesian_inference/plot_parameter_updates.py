@@ -6,7 +6,7 @@
 # 学習推移の可視化
 
 
-#%%
+# %%
 
 # ライブラリの読込 ---------------------------------------------------------------
 
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 
-#%%
+# %%
 
 # ベイズ推論の可視化 -------------------------------------------------------------
 
@@ -48,6 +48,7 @@ x_n = np.random.binomial(n=1, p=mu_truth, size=N)
 # x軸の範囲を設定
 x_min = 0 # (固定)
 x_max = 1 # (固定)
+print('x size:', x_min, x_max)
 
 # x軸の値を作成
 x_vec = np.arange(start=x_min, stop=x_max+1, step=1)
@@ -56,6 +57,7 @@ x_vec = np.arange(start=x_min, stop=x_max+1, step=1)
 # μ軸の範囲を設定
 mu_min = x_min # (固定)
 mu_max = x_max # (固定)
+print('μ size:', mu_min, mu_max)
 
 # μ軸の値を作成
 mu_vec = np.linspace(start=mu_min, stop=mu_max, num=1001)
@@ -75,9 +77,9 @@ b = 1.0
 mu_star = a / (a + b)
 
 # 初期値を記録
-trace_a_lt  = [a]
-trace_b_lt  = [b]
-trace_mu_lt = [mu_star]
+trace_a_lt       = [a]
+trace_b_lt       = [b]
+trace_mu_star_lt = [mu_star]
 
 # ベイズ推論による更新
 for n in range(N):
@@ -95,7 +97,7 @@ for n in range(N):
     # 更新値を記録
     trace_a_lt.append(a)
     trace_b_lt.append(b)
-    trace_mu_lt.append(mu_star)
+    trace_mu_star_lt.append(mu_star)
 
     # 動作確認
     print(f'\r{n+1} / {N}', end='', flush=True)
@@ -118,14 +120,14 @@ trace_b_lt = np.hstack(
 ).tolist()
 
 # 予測分布のパラメータを計算:式(3.19')
-trace_mu_lt = np.array(trace_a_lt) / (np.array(trace_a_lt) + np.array(trace_b_lt))
+trace_mu_star_lt = (
+    np.array(trace_a_lt) / (np.array(trace_a_lt) + np.array(trace_b_lt))
+).tolist()
 
 
 # %%
 
-### 推移の作図 -----
-
-#### 分布の計算 -----
+### 分布の計算 -----
 
 # 生成分布の確率を計算
 model_prob_vec = np.array([1.0-mu_truth, mu_truth])
@@ -137,8 +139,20 @@ anim_posterior_lt = [
 
 # 予測分布の確率を計算
 anim_predict_lt = [
-    np.array([1.0-trace_mu_lt[i], trace_mu_lt[i]]) for i in range(N+1)
+    np.array([1.0-trace_mu_star_lt[i], trace_mu_star_lt[i]]) for i in range(N+1)
 ]
+
+
+# %%
+
+### 推移の作図 -----
+
+# 保存先を指定
+dir_path = '../../../figure/bernoulli_model/parameter_updates/'
+
+# 拡張子を指定
+file_ext = '.mp4'
+#file_ext = '.gif'
 
 
 # %%
@@ -215,7 +229,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/bernoulli_model/parameter_updates/posterior.mp4', 
+    filename=dir_path+'posterior'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -247,7 +261,7 @@ def update(i):
     # 値を取得
     n       = i # データ番号
     x       = x_n[i-1] if n > 0 else np.nan # 観測値
-    mu_star = trace_mu_lt[i] # 成功確率パラメータ
+    mu_star = trace_mu_star_lt[i] # 成功確率パラメータ
     predict_prob_vec = anim_predict_lt[i] # 確率
     
     # 予測分布のラベルを作成
@@ -288,7 +302,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/bernoulli_model/parameter_updates/predict.mp4', 
+    filename=dir_path+'predict'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -344,7 +358,7 @@ def update(i):
     x       = x_n[i-1] if n > 0 else np.nan # 観測値
     a       = trace_a_lt[i]  # 形状パラメータ
     b       = trace_b_lt[i]  # 形状パラメータ
-    mu_star = trace_mu_lt[i] # 成功確率パラメータ
+    mu_star = trace_mu_star_lt[i] # 成功確率パラメータ
     posterior_dens_vec = anim_posterior_lt[i] # 確率密度
     predict_prob_vec   = anim_predict_lt[i]   # 確率
     
@@ -556,11 +570,11 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/bernoulli_model/parameter_updates/observation.mp4', 
+    filename=dir_path+'observation'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
 
-#%%
+# %%
 
 

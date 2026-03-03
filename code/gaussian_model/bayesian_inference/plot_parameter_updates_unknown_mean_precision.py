@@ -23,7 +23,7 @@ import matplotlib.cm as cm
 
 # ベイズ推論の可視化 -------------------------------------------------------------
 
-### 生成分布(ガウス分布)の設定 -----
+### 生成分布の設定 -----
 
 # 真のパラメータを指定
 mu_truth     = 5.0
@@ -53,11 +53,11 @@ x_n = np.random.normal(loc=mu_truth, scale=sigma_truth, size=N)
 ### 変数の設定 -----
 
 # x軸の範囲を設定
-u = 5.0
 k = 4.0
+u = 5.0
 x_size  = sigma_truth # 標準偏差
 x_size *= k # 定数倍
-x_size  = max(x_size, (x_n-mu_truth).max()) # サンプルと比較
+x_size  = max(x_size, *np.abs(x_n-mu_truth)) # サンプルと比較
 x_size  = np.ceil(x_size /u)*u # u単位で切り上げ
 x_min   = mu_truth - x_size
 x_max   = mu_truth + x_size
@@ -78,12 +78,12 @@ mu_vec = np.linspace(start=mu_min, stop=mu_max, num=501)
 
 # λ軸の範囲を設定
 lambda_min = 0.0
-#lambda_max = 1.0
 u = 0.6
 k = 2.5
 lambda_max = lambda_truth # 真値
 lambda_max *= k # 定数倍
 lambda_max = np.ceil(lambda_max /u)*u # u単位で切り上げ
+#lambda_max = 1.0
 print('λ size:', lambda_min, lambda_max)
 
 # λ軸の値を作成
@@ -115,7 +115,7 @@ beta = 1.0
 a    = 1.0
 b    = 1.0
 
-# 初期値による予測分布のパラメータを計算:式(3.95)
+# 予測分布のパラメータを計算:式(3.95)
 mu_s     = m
 lambda_s = beta * a / (1.0 + beta) / b
 nu_s     = 2.0 * a
@@ -138,8 +138,8 @@ for n in range(N):
     # μの事後分布のパラメータを更新:式(3.83)
     old_beta = beta
     old_m    = m
-    beta += 1.0
-    m     = (x_n[n] + old_beta * old_m) / beta
+    beta    += 1.0
+    m        = (x_n[n] + old_beta * old_m) / beta
     
     # λの事後分布のパラメータを更新:式(3.88)
     a += 0.5
@@ -201,19 +201,21 @@ trace_nu_s_lt = (
 
 # %%
 
-### 推移の作図 -----
-
-#### 分布の計算 -----
+### 分布の計算 -----
 
 # 生成分布の確率密度を計算
 model_dens_vec = norm.pdf(x=x_vec, loc=mu_truth, scale=sigma_truth)
 
 # 事後分布の確率密度を計算
 anim_posterior_mu_lt = [
-    norm.pdf(x=mu_mat, loc=trace_m_lt[i], scale=1.0/np.sqrt(trace_beta_lt[i]*lambda_mat)) for i in range(N+1)
+    norm.pdf(
+        x=mu_mat, loc=trace_m_lt[i], scale=1.0/np.sqrt(trace_beta_lt[i]*lambda_mat)
+    ) for i in range(N+1)
 ]
 anim_posterior_lambda_lt = [
-    gamma.pdf(x=lambda_mat, a=trace_a_lt[i], scale=1.0/trace_b_lt[i]) for i in range(N+1)
+    gamma.pdf(
+        x=lambda_mat, a=trace_a_lt[i], scale=1.0/trace_b_lt[i]
+    ) for i in range(N+1)
 ]
 anim_posterior_lt = [
     anim_posterior_mu_lt[i] * anim_posterior_lambda_lt[i] for i in range(N+1)
@@ -221,8 +223,22 @@ anim_posterior_lt = [
 
 # 予測分布の確率密度を計算
 anim_predict_lt = [
-    t.pdf(x=x_vec, df=trace_nu_s_lt[i], loc=trace_mu_s_lt[i], scale=1.0/np.sqrt(trace_lambda_s_lt[i])) for i in range(N+1)
+    t.pdf(
+        x=x_vec, df=trace_nu_s_lt[i], loc=trace_mu_s_lt[i], scale=1.0/np.sqrt(trace_lambda_s_lt[i])
+    ) for i in range(N+1)
 ]
+
+
+# %%
+
+### 推移の作図 -----
+
+# 保存先を指定
+dir_path = '../../../figure/gaussian_model/parameter_updates_unknown_mean_precision/'
+
+# 拡張子を指定
+file_ext = '.mp4'
+#file_ext = '.gif'
 
 
 # %%
@@ -236,9 +252,10 @@ dens_max = np.ceil(dens_max /u)*u # u単位で切り上げ
 print(dens_max)
 
 # 等高線を設定
-level_num = 21
+level_num = 24
 dens_vals = np.linspace(start=0.0, stop=dens_max, num=level_num)
 print(dens_vals)
+
 
 # %%
 
@@ -335,7 +352,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/gaussian_model/parameter_updates_mean_precision/posterior_2d.mp4', 
+    filename=dir_path+'posterior_2d'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -365,8 +382,6 @@ def update(i):
 
     # 前フレームのグラフを初期化
     ax.cla()
-    ax2x.cla()
-    ax2y.cla()
     
     # 値を取得
     n = i # データ番号
@@ -436,7 +451,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/gaussian_model/parameter_updates_mean_precision/posterior_3d.mp4', 
+    filename=dir_path+'posterior_3d'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -453,7 +468,7 @@ print(dens_max)
 
 # 図を初期化
 fig, ax = plt.subplots(figsize=(9, 6), dpi=100, facecolor='white', constrained_layout=True)
-fig.suptitle("Student's t Distribution", fontsize=20)
+fig.suptitle("Student's t distribution", fontsize=20)
 
 # 初期化処理を定義
 def init():
@@ -580,6 +595,8 @@ def update(i):
     [ax.cla() for ax in axes.flatten()]
     [ax.cla() for ax in axes2x]
     [ax.cla() for ax in axes2y]
+
+    ##### パラメータの設定 -----
 
     # 値を取得
     n = i # データ番号
@@ -947,7 +964,7 @@ def update(i):
     ) # パラメータラベル
     ax.set_xlabel('$x$')
     ax.set_ylabel('density')
-    ax.set_title("Student's t Distribution", loc='left')
+    ax.set_title("Student's t distribution", loc='left')
     ax.legend(loc='upper right', prop={'size': 8})
     ax.grid(zorder=0)
     ax.set_xlim(xmin=x_min, xmax=x_max)          # (目盛の共通化用)
@@ -966,7 +983,7 @@ def update(i):
     # (警告文の回避用)
     tmp_lambda_vec = lambda_vec[lambda_vec > 0.0]
 
-    # 確率密度を計算
+    # 最頻値における確率密度を計算
     tmp_N_dens_vec = norm.pdf(x=mu_truth, loc=mu_truth, scale=1.0/np.sqrt(tmp_lambda_vec))
     tmp_N_dens_val = norm.pdf(x=mu_truth, loc=mu_truth, scale=sigma_truth)
     tmp_t_dens_vec = t.pdf(x=mu_s, df=nu_s, loc=mu_s, scale=1.0/np.sqrt(tmp_lambda_vec))
@@ -1028,7 +1045,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/gaussian_model/parameter_updates_mean_precision/observation.mp4', 
+    filename=dir_path+'observation'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 

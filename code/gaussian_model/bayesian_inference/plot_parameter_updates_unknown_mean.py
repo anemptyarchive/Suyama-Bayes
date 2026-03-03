@@ -22,7 +22,7 @@ from matplotlib.animation import FuncAnimation
 
 # ベイズ推論の可視化 -------------------------------------------------------------
 
-### 生成分布(ガウス分布)の設定 -----
+### 生成分布の設定 -----
 
 # 真のパラメータを指定
 mu_truth = 25.0
@@ -51,11 +51,11 @@ x_n = np.random.normal(loc=mu_truth, scale=1.0/np.sqrt(lmd), size=N)
 ### 変数の設定 -----
 
 # x軸の範囲を設定
-u = 5.0
 k = 4.0
+u = 5.0
 x_size  = 1.0/np.sqrt(lmd) # 標準偏差
 x_size *= k # 定数倍
-x_size  = max(x_size, (x_n-mu_truth).max()) # サンプルと比較
+x_size  = max(x_size, *np.abs(x_n-mu_truth)) # サンプルと比較
 x_size  = np.ceil(x_size /u)*u # u単位で切り上げ
 x_min   = mu_truth - x_size
 x_max   = mu_truth + x_size
@@ -85,14 +85,14 @@ m         = 0.0
 lambda_mu = 0.001
 
 # 予測分布のパラメータを計算:式(3.62)
-mu_s     = m
-lambda_s = lmd * lambda_mu / (lmd + lambda_mu)
+mu_star     = m
+lambda_star = lmd * lambda_mu / (lmd + lambda_mu)
 
 # 初期値を記録
-trace_m_lt         = [m]
-trace_lambda_mu_lt = [lambda_mu]
-trace_mu_s_lt      = [mu_s]
-trace_lambda_s_lt  = [lambda_s]
+trace_m_lt            = [m]
+trace_lambda_mu_lt    = [lambda_mu]
+trace_mu_star_lt      = [mu_star]
+trace_lambda_star_lt  = [lambda_star]
 
 # ベイズ推論による更新
 for n in range(N):
@@ -102,20 +102,20 @@ for n in range(N):
     
     # 事後分布のパラメータを更新:式(3.53, 3.54)
     lambda_mu_old = lambda_mu
-    lambda_mu += lmd
-    m         *= lambda_mu_old
-    m         += x * lmd
-    m         /= lambda_mu
+    lambda_mu    += lmd
+    m            *= lambda_mu_old
+    m            += x * lmd
+    m            /= lambda_mu
     
     # 予測分布のパラメータを更新:式(3.62)
-    mu_s     = m
-    lambda_s = lmd * lambda_mu / (lmd + lambda_mu)
+    mu_star     = m
+    lambda_star = lmd * lambda_mu / (lmd + lambda_mu)
     
     # 更新値を記録
     trace_m_lt.append(m)
     trace_lambda_mu_lt.append(lambda_mu)
-    trace_mu_s_lt.append(mu_s)
-    trace_lambda_s_lt.append(lambda_s)
+    trace_mu_star_lt.append(mu_star)
+    trace_lambda_star_lt.append(lambda_star)
 
     # 動作確認
     print(f'\r{n+1} / {N}', end='', flush=True)
@@ -138,30 +138,44 @@ trace_lambda_mu_lt = (
 ).tolist()
 
 # 予測分布のパラメータを計算:式(3.62)
-trace_mu_s_lt = trace_m_lt.copy()
-trace_lambda_s_lt = (
+trace_mu_star_lt     = trace_m_lt.copy()
+trace_lambda_star_lt = (
     1.0 / (1.0/lmd + 1.0/np.array(trace_lambda_mu_lt))
 ).tolist()
 
 
 # %%
 
-### 推移の作図 -----
-
-#### 分布の計算 -----
+### 分布の計算 -----
 
 # 生成分布の確率密度を計算
 model_dens_vec = norm.pdf(x=x_vec, loc=mu_truth, scale=1.0/np.sqrt(lmd))
 
 # 事後分布の確率密度を計算
 anim_posterior_lt = [
-    norm.pdf(x=mu_vec, loc=trace_m_lt[i], scale=1.0/np.sqrt(trace_lambda_mu_lt[i])) for i in range(N+1)
+    norm.pdf(
+        x=mu_vec, loc=trace_m_lt[i], scale=1.0/np.sqrt(trace_lambda_mu_lt[i])
+    ) for i in range(N+1)
 ]
 
 # 予測分布の確率密度を計算
 anim_predict_lt = [
-    norm.pdf(x=x_vec, loc=trace_mu_s_lt[i], scale=1.0/np.sqrt(trace_lambda_s_lt[i])) for i in range(N+1)
+    norm.pdf(
+        x=x_vec, loc=trace_mu_star_lt[i], scale=1.0/np.sqrt(trace_lambda_star_lt[i])
+    ) for i in range(N+1)
 ]
+
+
+# %%
+
+### 推移の作図 -----
+
+# 保存先を指定
+dir_path = '../../../figure/gaussian_model/parameter_updates_unknown_mean/'
+
+# 拡張子を指定
+file_ext = '.mp4'
+#file_ext = '.gif'
 
 
 # %%
@@ -243,7 +257,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/gaussian_model/parameter_updates_mean/posterior.mp4', 
+    filename=dir_path+'posterior'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -275,14 +289,14 @@ def update(i):
     # 値を取得
     n = i # データ番号
     x = x_n[i-1] if n > 0 else np.nan # 観測値
-    mu_s     = trace_mu_s_lt[i]     # 平均パラメータ
-    lambda_s = trace_lambda_s_lt[i] # 精度パラメータ
+    mu_star     = trace_mu_star_lt[i]     # 平均パラメータ
+    lambda_star = trace_lambda_star_lt[i] # 精度パラメータ
     predict_dens_vec = anim_predict_lt[i] # 確率密度
     
     # 予測分布のラベルを作成
     predict_param_lbl  = f'$N = {n}, '
     predict_param_lbl += f'\\mu_{{truth}} = {mu_truth:.2f}, \\lambda = {lmd:.5f}, '
-    predict_param_lbl += f'\\hat{{\\mu}}_{{*}} = {mu_s:.2f}, \\hat{{\\lambda}}_{{*}} = {lambda_s:.5f}$'
+    predict_param_lbl += f'\\hat{{\\mu}}_{{*}} = {mu_star:.2f}, \\hat{{\\lambda}}_{{*}} = {lambda_star:.5f}$'
 
     # 予測分布を描画
     ax.plot(
@@ -321,7 +335,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/gaussian_model/parameter_updates_mean/predict.mp4', 
+    filename=dir_path+'predict'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -387,8 +401,8 @@ def update(i):
     x = x_n[i-1] if n > 0 else np.nan # 観測値
     m         = trace_m_lt[i]         # 平均パラメータ
     lambda_mu = trace_lambda_mu_lt[i] # 精度パラメータ
-    mu_s      = trace_mu_s_lt[i]      # 平均パラメータ
-    lambda_s  = trace_lambda_s_lt[i]  # 精度パラメータ
+    mu_star      = trace_mu_star_lt[i]     # 平均パラメータ
+    lambda_star  = trace_lambda_star_lt[i] # 精度パラメータ
     posterior_dens_vec = anim_posterior_lt[i] # 確率密度
     predict_dens_vec   = anim_predict_lt[i]   # 確率密度
     
@@ -544,10 +558,10 @@ def update(i):
     ##### 予測分布の作図 -----
 
     # 予測分布の期待値を計算
-    E_x = mu_s
+    E_x = mu_star
     
     # 予測分布のラベルを作成
-    predict_param_lbl  = f'$\\hat{{\\mu}}_{{*}} = {mu_s:.2f}, \\hat{{\\lambda}}_{{*}} = {lambda_s:.5f}$\n'
+    predict_param_lbl  = f'$\\hat{{\\mu}}_{{*}} = {mu_star:.2f}, \\hat{{\\lambda}}_{{*}} = {lambda_star:.5f}$\n'
     predict_param_lbl += f'$E[x] = \\hat{{\\mu}}_{{*}} = {E_x:.2f}$'
 
     # 予測分布を描画
@@ -614,7 +628,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/gaussian_model/parameter_updates_mean/observation.mp4', 
+    filename=dir_path+'observation'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 

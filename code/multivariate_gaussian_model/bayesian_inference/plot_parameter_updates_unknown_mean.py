@@ -48,26 +48,24 @@ lambda_dd = np.linalg.inv(sigma2_dd)
 ### 観測データの生成 -----
 
 # シードを設定:(ノートとの対応用)
-#np.random.seed(86)
+np.random.seed(86)
 
 # データ数(試行回数)を指定
-N = 100
+N = 300
 
 # 観測データを生成
-x_nd = np.random.multivariate_normal(
-    mean=mu_truth_d, cov=sigma2_dd, size=N
-)
+x_nd = np.random.multivariate_normal(mean=mu_truth_d, cov=sigma2_dd, size=N)
 
 
 # %%
 
-#### 変数の設定 -----
+### 変数の設定 -----
 
 # x軸の範囲を設定
-k = 2
-u = 5
-x_0_size  = np.sqrt(sigma2_dd[0, 0]) # 1軸の標準偏差
-x_1_size  = np.sqrt(sigma2_dd[1, 1]) # 2軸の標準偏差
+k = 2.0
+u = 5.0
+x_0_size  = np.sqrt(sigma2_dd[0, 0]) # 標準偏差
+x_1_size  = np.sqrt(sigma2_dd[1, 1]) # 標準偏差
 x_0_size *= k # 定数倍
 x_1_size *= k # 定数倍
 #x_0_size  = max(x_0_size, *np.abs(x_nd[:, 0]-mu_truth_d[0])) # サンプルと比較
@@ -189,9 +187,7 @@ trace_lambda_star_lt = [
 
 # %%
 
-### 推移の作図 -----
-
-#### 分布の計算 -----
+### 分布の計算 -----
 
 # 生成分布の確率密度を計算
 model_dens_grid = multivariate_normal.pdf(
@@ -211,6 +207,18 @@ anim_predict_lt = [
         x=x_arr, mean=trace_mu_star_lt[i], cov=np.linalg.inv(trace_lambda_star_lt[i])
     ).reshape(x_dims) for i in range(N+1)
 ]
+
+
+# %%
+
+### 推移の作図 -----
+
+# 保存先を指定
+dir_path = '../../../figure/multivariate_gaussian_model/parameter_updates_unknown_mean/'
+
+# 拡張子を指定
+file_ext = '.mp4'
+#file_ext = '.gif'
 
 
 # %%
@@ -329,7 +337,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/multivariate_gaussian_model/parameter_updates_unknown_mean/posterior_2d.mp4', 
+    filename=dir_path+'posterior_2d'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -431,7 +439,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/multivariate_gaussian_model/parameter_updates_unknown_mean/posterior_3d.mp4', 
+    filename=dir_path+'posterior_3d'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -554,7 +562,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/multivariate_gaussian_model/parameter_updates_unknown_mean/predict_2d.mp4', 
+    filename=dir_path+'predict_2d'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -656,7 +664,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/multivariate_gaussian_model/parameter_updates_unknown_mean/predict_3d.mp4', 
+    filename=dir_path+'predict_3d'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -1039,7 +1047,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/multivariate_gaussian_model/parameter_updates_unknown_mean/observation.mp4', 
+    filename=dir_path+'observation'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 

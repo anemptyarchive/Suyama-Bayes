@@ -46,8 +46,8 @@ x_n = np.random.poisson(lam=lambda_truth, size=N)
 ### 変数の設定 -----
 
 # x軸の範囲を設定
-u = 5.0
 k = 3.0
+u = 5.0
 x_min = 0.0
 x_max = lambda_truth # 期待値
 x_max *= k # 定数倍
@@ -145,9 +145,7 @@ trace_p_lt = (
 
 # %%
 
-### 推移の作図 -----
-
-#### 分布の計算 -----
+### 分布の計算 -----
 
 # 生成分布の確率を計算
 model_prob_vec = poisson.pmf(k=x_vec, mu=lambda_truth)
@@ -161,6 +159,18 @@ anim_posterior_lt = [
 anim_predict_lt = [
     nbinom.pmf(k=x_vec, n=trace_r_lt[i], p=trace_p_lt[i]) for i in range(N+1)
 ]
+
+
+# %%
+
+### 推移の作図 -----
+
+# 保存先を指定
+dir_path = '../../../figure/poisson_model/parameter_updates/'
+
+# 拡張子を指定
+file_ext = '.mp4'
+#file_ext = '.gif'
 
 
 # %%
@@ -237,7 +247,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/poisson_model/parameter_updates/posterior.mp4', 
+    filename=dir_path+'posterior'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -311,7 +321,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/poisson_model/parameter_updates/predict.mp4', 
+    filename=dir_path+'predict'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -580,7 +590,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename='../../../figure/poisson_model/parameter_updates/observation.mp4', 
+    filename=dir_path+'observation'+file_ext, 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
